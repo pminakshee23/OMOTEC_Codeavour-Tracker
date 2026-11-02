@@ -123,6 +123,7 @@ function confetti(){for(let i=0;i<18;i++){const d=document.createElement("div");
 function prof(t){const F=AF().filter(f=>f.team==t.id),ed=canE(t),ad=U.role=="admin"||(U.role=="lead"&&U.trk==t.trk);
 const B={"🤖 Overview":`<div class="two"><div class="card"><h3>Team Information</h3>Trainer: ${e(t.tr)}<br>Project Lead: ${e(t.pl)}<br>Start: ${t.start}<br>Progress: ${done(t)}/${t.s.length} ${bar(prog(t))}${ad?`<p><button class="btn" onclick="sure('ar${t.id}',()=>{tm('${t.id}').arch=${t.arch?0:1};log('Archive toggled ${t.id}');TID=null;draw()})">${t.arch?"Restore":"Archive"} team</button> <button class="btn r" onclick="sure('rs${t.id}',()=>{tm('${t.id}').s.fill(0);log('Progress reset ${t.id}');draw()})">Reset progress</button></p>`:""}</div><div class="card"><h3>${t.trk==1?"💡 Project & Prototype":t.trk==2?"🏁 Robot Design & Robot":"⚽ Robot Readiness"}</h3>${t.trk<3?`Approval: ${sel("ap",APS,t.ap,t.id,ad)}<br>`:""}${t.trk==1?`Prototype: ${sel("pr",PS,t.pr,t.id,ed)}`:`Robot 1: ${sel("r1",RS,t.r1,t.id,ed)}`}${t.trk==3?`<br>Robot 2: ${sel("r2",RS,t.r2,t.id,ed)}`:""}${t.trk==1&&S.ideas.some(i=>i.team==t.id&&i.st=="Approved")?`<br>Selected idea: ${e(S.ideas.find(i=>i.team==t.id&&i.st=="Approved").title)}`:""}</div></div>`,
 "👥 Reassign Trainer / Lead":U.role=="admin"?`<div class="card"><h3>Reassign Trainer & Project Lead</h3><p>Changes apply to this team only. Existing progress, weekly updates, ideas, inventory and history are retained.</p><div class="top"><label>Trainer <select id="reassignTrainer">${S.users.filter(u=>u.role=="trainer"&&u.st!="Inactive").map(u=>`<option value="${e(u.n)}" ${u.n==t.tr?"selected":""}>${e(u.n)}${u.br?" ("+e(u.br)+")":""}</option>`).join("")}</select></label><label>Project Lead <select id="reassignLead">${S.users.filter(u=>u.role=="lead"&&u.st!="Inactive"&&(!u.trk||u.trk==t.trk)).map(u=>`<option value="${e(u.n)}" ${u.n==t.pl?"selected":""}>${e(u.n)}${u.trk?" – Track "+u.trk:""}</option>`).join("")}</select></label><button class="btn o" onclick="reassignTeam('${t.id}')">Save reassignment</button></div><p style="color:var(--mu)">Only active trainers and leads for the relevant track are selectable. Add or reactivate a user in User Management if needed.</p></div>`:"",
+"🤖 Robot Approval":t.trk===2?robotApprovalPanel(t):`<div class="card">Robot approval is managed for Track 2 teams.</div>`,
 "📚 Sessions":`<div class="card"><h3>Sessions</h3>${sg(t)}</div>`,
 "🏁 Milestones":msT(t),...(t.trk==2?{"🏆 Track 2 Scores":t2Tab(t)}:{}),"📦 Inventory":`<div class="card">Inventory required: <b>${iqf(t).req}</b> · Submitted: <b>${iqf(t).sub}</b> · Approval: ${iqf(t).ap} · Received: ${iqf(t).rc}<br><button class="btn o" onclick="window.open('${IQU}','_blank','noopener')">Submit Inventory Requirement</button></div>`,
 "🚩 Flags":`<div class="card">${F.map(f=>`${pill(f.sev,f.sev)} ${e(f.cat)} – ${e(f.issue)}<br>`).join("")||"🎉 No active flags"}</div>`,
@@ -613,6 +614,36 @@ t2h=function(){let html=t2HeadOriginal();html=html.replace('<!--S4-->${lb}','<!-
  return html;
 };
 t2=function(){const sections=t2h().split(/<!--S\d-->/);sections.splice(4,1);if((TB.t2||0)>4)TB.t2=4;return tabs(sections.join('<!--S1-->'),['📊 Dashboard','📝 New Evaluation','📜 Score History','⚙️ Rules','⚡ Challenge Practice Log'],'t2')};
+
+
+/* Track 2 robot approval submission and review */
+function robotApprovalPanel(t){
+ const L=(S.robotApprovals||[]).filter(x=>x.team===t.id).slice().reverse(),last=L[0];
+ const trainer=U.role==='trainer'&&t.tr===U.n,reviewer=U.role==='admin'||(U.role==='lead'&&Number(U.trk)===2);
+ return `<div class="card"><h3>🤖 Robot Approval – Trainer Submission</h3><p>Trainer submits robot readiness for review. Track 2 Lead or Super Admin reviews and approves only after completion.</p>
+ ${trainer||reviewer?`<div class="top"><label>Robot status <select id="robotReadyStatus"><option>Not Started</option><option>In Progress</option><option>Testing</option><option>Completed</option></select></label><label>Submission date <input type="date" id="robotReadyDate" value="${today()}"></label></div><textarea id="robotReadyNote" rows="3" style="width:100%" placeholder="Robot assembly, sensor testing, challenge readiness, pending issues"></textarea><div class="top"><button class="btn o" onclick="robotSubmit('${t.id}')">Submit Robot Status</button></div>`:''}
+ ${last?`<p><b>Latest:</b> ${e(last.robotStatus)} · ${e(last.reviewStatus)} · Submitted ${e(last.date)} by ${e(last.by)}</p>`:''}
+ <h3>Submission & Approval History</h3><table><tr><th>Date</th><th>Submitted by</th><th>Robot status</th><th>Trainer comments</th><th>Review</th><th>Lead/Admin comments</th><th>Action</th></tr>
+ ${L.map(r=>`<tr><td>${e(r.date)}</td><td>${e(r.by)}</td><td>${e(r.robotStatus)}</td><td>${e(r.note||'')}</td><td>${e(r.reviewStatus)}</td><td>${e(r.reviewNote||'')}</td><td>${reviewer&&r.reviewStatus==='Submitted'?`<input id="robotReviewNote${r.id}" placeholder="Review comment"><button class="btn g" onclick="robotReview('${r.id}','Approved')" ${r.robotStatus==='Completed'?'':'disabled'}>Approve</button><button class="btn o" onclick="robotReview('${r.id}','Changes Required')">Request Changes</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7">No robot status submissions yet</td></tr>'}</table></div>`;
+}
+function robotSubmit(id){const t=tm(id);if(!t||t.trk!==2||!(U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)))return toast('Trainer or Super Admin access required');
+ const robotStatus=document.getElementById('robotReadyStatus')?.value,date=document.getElementById('robotReadyDate')?.value,note=document.getElementById('robotReadyNote')?.value.trim()||'';
+ if(!date||!robotStatus)return toast('Choose a date and robot status');
+ (S.robotApprovals=S.robotApprovals||[]).push({id:'RA'+Date.now(),team:id,date,by:U.n,robotStatus,note,reviewStatus:'Submitted',reviewBy:'',reviewNote:''});
+ log('Robot status submitted for approval: '+robotStatus,id);save();toast('Robot status submitted for review');draw();}
+function robotReview(id,status){const r=(S.robotApprovals||[]).find(x=>x.id===id);if(!r)return;const t=tm(r.team);if(!(U.role==='admin'||(U.role==='lead'&&Number(U.trk)===2)))return toast('Only Track 2 Lead or Super Admin can review');if(status==='Approved'&&r.robotStatus!=='Completed')return toast('Robot status must be Completed before approval');
+ r.reviewStatus=status;r.reviewBy=U.n;r.reviewNote=document.getElementById('robotReviewNote'+id)?.value.trim()||'';
+ if(status==='Approved'){t.r1='Functional';t.robotApproval='Approved'}else t.robotApproval='Changes Required';
+ log('Robot approval '+status+' by '+U.n,r.team);save();toast('Robot approval: '+status);draw();}
+/* Manual practice stopwatch minutes and seconds in evaluation screen */
+function t2SetEvalPracticeTime(){if(!EVD)return;const m=Number(document.getElementById('evalPrMin')?.value),sec=Number(document.getElementById('evalPrSec')?.value);if(!Number.isInteger(m)||m<0||!Number.isInteger(sec)||sec<0||sec>59)return toast('Enter valid minutes and seconds (0–59)');clearInterval(PVI);PVI=null;PVS=m*60+sec;EVD.ptime=mmss(PVS);const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;toast('Practice time set');}
+const robotEvalFormOriginal=evForm;
+evForm=function(T){let h=robotEvalFormOriginal(T);if(!EVD)return h;
+ h=h.replace('<div class="card"><h3>Challenges</h3>',`<div class="card"><h3>Practice Timer – Manual Time</h3><div class="top"><label>Minutes <input id="evalPrMin" type="number" min="0" value="${Math.floor(PVS/60)}" style="width:100px"></label><label>Seconds <input id="evalPrSec" type="number" min="0" max="59" value="${PVS%60}" style="width:100px"></label><button class="btn o" onclick="t2SetEvalPracticeTime()">Add Manual Time</button></div><label>Trainer / Judge Comments<textarea id="evalComments" rows="2" style="width:100%" oninput="EVD.comments=this.value">${e(EVD.comments||'')}</textarea></label></div><div class="card"><h3>Challenges</h3>`);
+ return h;
+};
+const robotEvSaveOriginal=evSave;
+evSave=function(fin){if(EVD)EVD.comments=document.getElementById('evalComments')?.value||EVD.comments||'';return robotEvSaveOriginal(fin)};
 
 load();setTh(TH);(async()=>{if(CLOUD){if(!CODE)return codeUI();if(await cloudLoad()){await ensureHashes();loginUI();startPoll()}return}await ensureHashes();loginUI();initSync()})();
 </script></body></html>
