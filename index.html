@@ -223,12 +223,35 @@ function weekly(){const T=fT(),W=wstats(T),wn=wk(),o=T.map(t=>`<option value="${
 <div class="card tw"><h3>Due / overdue this week</h3>${T.filter(t=>wst(t)==1||wst(t)==2).map(t=>e(t.name)+" ("+(wst(t)==2?"overdue":"due soon")+")").join(", ")||"None"}</div><div class="card tw"><table><tr><th>Week start<th>Team<th>Project status<th>Inventory<th>Support<th>By<th>Technical challenges<th>Trainer remarks<th>Lead comment<th>Revisions</tr>${S.w.filter(w=>T.some(t=>t.id==w.team)).sort((a,b)=>String(b.week).localeCompare(String(a.week))).map(w=>`<tr><td>${w.week}<td>${e(tm(w.team).name)}<td>${pill(w.status,w.status=="On Track"||w.status=="Completed"?"Green":w.status=="In Progress"?"Yellow":"Red")}<td>${e(w.is||"-")}<td>${e(w.sp||"Support: No")}<td>${e(w.by)}<td>${e(w.ch||"-")}<td>${e(w.notes||"-")}<td>${U.role=="trainer"?e(w.lc||""):`<input value="${e(w.lc||"")}" onchange="S.w.find(x=>x.id=='${w.id}').lc=this.value;save()">`}<td>${(w.h||[]).length}</tr>`).join("")}</table></div>`}
 function saveW(){const id=v("wt"),st=v("ws"),k=mon(v("wk")||wk()),t=tm(id);if(!id)return toast("Select a team");if(wst(t,k)==-1)return toast("That week is outside this team's training period");const sp=v("wsp"),ch=v("wch"),notes=v("wn");const o={team:id,week:k,plan:0,done:0,ms:"",ps:st,is:v("wis"),status:st,sp:sp,sup:false,by:U.n,work:"",ch:ch,pend:"",nx:"",ev:"",notes:notes},x=S.w.find(w=>w.team==id&&w.week==k&&!w.sup);if(x){x.h=(x.h||[]).concat([{...x,h:undefined}]);Object.assign(x,o)}else S.w.push({id:"W"+Date.now(),...o,h:[]});if(sp=="Support: Yes"){log("Support requested – Track Lead notified",id);toast("Support requested – flagged for Lead/Admin review")}log("Weekly update submitted ("+k+")",id);save();toast("Update saved");draw()}
 const iqf=t=>(S.iq[t.id]=S.iq[t.id]||{req:"Yes",sub:"No",date:"",ref:"",ap:"Pending",rc:"No",pend:"",exp:"",rm:""});
-function setIq(id,f,val){const q=S.iq[id];if(f=="sub"&&val=="Yes"&&(!q.date||!q.ref)){toast("Enter submission date and reference / evidence link first");return draw()}q[f]=val;if(f=='req'&&val=='Yes')toast('⚠️ Inventory required – Track Lead alerted until the form is submitted');log("Inventory requirement "+f+" → "+val,id);save();draw()}
+function canIqField(t,f){
+ if(!U||!t||!mine(t))return false;
+ if(U.role==="admin")return true;
+ if(U.role==="trainer")return t.tr===U.n&&["req","sub","date","ref","pend","exp","rm"].includes(f);
+ if(U.role==="lead")return t.trk==U.trk&&["ap","rc","pend","exp","deadline","rm"].includes(f);
+ return false;
+}
+function setIq(id,f,val){
+ const t=S.teams.find(x=>x.id===id);if(!t||!canIqField(t,f))return toast("You do not have permission to edit this field");
+ const q=iqf(t);
+ if(f==="sub"&&val==="Yes"&&(!q.date||!q.ref)){toast("Enter submission date and reference link first");return draw()}
+ q[f]=val;
+ log("Inventory requirement "+f+" → "+val,id);save();draw();
+}
 function inv(){return invReq()}
-function invReq(){const T=fT();return`<h2>Inventory Management</h2><div class="card"><button class="btn o big" onclick="window.open('${IQU}','_blank','noopener');toast('Mentor Requirement Form opened in a new tab. Opening it does not mark the requirement as submitted – confirm below after you submit.')">Submit Inventory Requirement</button></div><div class="card tw"><h3>Requirement tracking</h3><table><tr><th>Team<th>Track<th>Branch<th>Trainer<th>Required<th>Submitted (manual confirm)<th>Date<th>Reference link<th>Approval<th>Received<th>Pending items<th>Expected delivery<th>Requirement deadline<th>Remarks<th>Alert</tr>${T.map(t=>{const q=iqf(t),ed=canE(t),f=(k,ty)=>`<input type="${ty||"text"}" value="${e(q[k])}" ${ed?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)" style="width:${ty=="date"?130:105}px">`,sl=(k,L)=>`<select ${ed?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)">${L.map(o=>`<option ${q[k]==o?"selected":""}>${o}</option>`).join("")}</select>`;return`<tr><td>${e(t.name)} (${t.id})<td>T${t.trk}<td>${t.br}<td>${e(t.tr)}<td>${sl("req",["Yes","No"])}<td>${sl("sub",["No","Yes"])}<td>${f("date","date")}<td>${f("ref")}<td>${sl("ap",["Pending","Under Review","Approved","Rejected"])}<td>${sl("rc",["No","Yes"])}<td>${f("pend")}<td>${f("exp","date")}<td>${f("deadline","date")}<td>${f("rm")}<td>${done(t)<3?"No alert before 3 completed classes":q.req=="Yes"&&q.sub!="Yes"?`<button class="btn o" onclick="alertInventoryRequirement('${t.id}')">Alert: Send requirement form</button>`:q.req=="Yes"&&q.rc!="Yes"?"Awaiting inventory allocation":"OK"}</tr>`}).join("")}</table></div>`}
+function invReq(){
+ const T=fT();
+ const fields=["req","sub","date","ref","ap","rc","pend","exp","deadline","rm"];
+ const sel=(t,q,k,opts)=>`<select ${canIqField(t,k)?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)">${opts.map(o=>`<option ${q[k]===o?"selected":""}>${o}</option>`).join("")}</select>`;
+ const inp=(t,q,k,type="text")=>`<input type="${type}" value="${e(q[k]||"")}" ${canIqField(t,k)?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)" style="width:${type==="date"?130:125}px">`;
+ return `<h2>Inventory Management</h2><div class="card"><b>Separate responsibilities:</b> Trainers submit requirements, dates, links and remarks. Track Leads review approvals, inventory receipt and deadlines. Super Admin can edit all fields.<br><br><button class="btn o big" onclick="window.open('${IQU}','_blank','noopener')">Open Inventory Requirement Form</button></div><div class="card tw"><h3>Requirement tracking</h3><table><tr><th>Team<th>Track<th>Branch<th>Trainer<th>Required<th>Submitted (manual confirm)<th>Date<th>Reference link<th>Approval<th>Received<th>Pending items<th>Expected delivery<th>Requirement deadline<th>Remarks<th>Alert</tr>${T.map(t=>{
+ const q=iqf(t),n=done(t),canAlert=U.role==="admin"||(U.role==="lead"&&t.trk==U.trk);
+ const alert=n<3?"No flags before 3 classes":q.req==="Yes"&&q.sub!=="Yes"?(canAlert?`<button class="btn o" onclick="alertInventoryRequirement('${t.id}')">Alert: Requirement form pending</button>`:"Requirement form pending – lead notified"):q.req==="Yes"&&q.rc!=="Yes"?"Awaiting inventory":"OK";
+ return `<tr><td>${e(t.name)} (${t.id})<td>T${t.trk}<td>${e(t.br)}<td>${e(t.tr)}<td>${sel(t,q,"req",["Yes","No"])}<td>${sel(t,q,"sub",["No","Yes"])}<td>${inp(t,q,"date","date")}<td>${inp(t,q,"ref")}<td>${sel(t,q,"ap",["Pending","Under Review","Approved","Rejected"])}<td>${sel(t,q,"rc",["No","Yes"])}<td>${inp(t,q,"pend")}<td>${inp(t,q,"exp","date")}<td>${inp(t,q,"deadline","date")}<td>${inp(t,q,"rm")}<td>${alert}</tr>`;
+ }).join("")}</table></div>`;
+}
 function alertInventoryRequirement(id){
  const t=tm(id),q=iqf(t);
- if(U.role!=="admin"&&U.role!=="lead")return toast("Only Admin or Lead can send inventory alerts");
+ if(U.role!=="admin"&&!(U.role==="lead"&&t.trk==U.trk))return toast("Only Admin or assigned Track Lead can send inventory alerts");
  if(done(t)<3)return toast("Alerts begin after 3 completed classes");
  if(q.req!=="Yes"||q.sub==="Yes")return toast("No outstanding requirement form for this team");
  const existing=S.fl.find(f=>f.team===id&&f.cat==="Inventory Requirement"&&f.st!=="Closed");
@@ -291,7 +314,7 @@ if(c.minScore>0&&l2.length==2&&l2.every(z=>z.final<c.minScore))add("Orange","Moc
 c.crit.forEach(n=>{const k=CH.findIndex(x=>x[0]==n);if(k>=0&&l2.length==2&&l2.every(z=>+z.ch[k]==0))add("Red","Mock Evaluation","Critical mission repeatedly incomplete: "+n)});
 if(F.length&&+F[F.length-1].fouls>c.maxFouls)add("Orange","Robot Testing","Excessive fouls in last evaluation");
 if(d>=35&&F.filter(z=>z.type=="Mock").length<c.mocks)add("Red","Mock Evaluation","Final mock evaluation pending");if(t.r1!="Functional"&&d>=S.CFG.rb)add("Red","Robot Testing","Robot not competition-ready")}
-function invAlert(T){const p=T.filter(t=>{const q=iqf(t);return q.req=="Yes"&&q.sub!="Yes"});return p.length?`<div class="card" style="border-top-color:#d92d3a">⚠️ <b>Inventory required – form not submitted (${p.length}):</b> ${p.map(t=>e(t.name)+" ("+e(t.tr)+")").join(", ")}. ${U.role=="trainer"?"Please submit the Mentor Requirement Form.":"Track Lead: please follow up with the trainers."}</div>`:""}
+function invAlert(T){const p=T.filter(t=>{const q=iqf(t);return done(t)>=3&&q.req=="Yes"&&q.sub!="Yes"});return p.length?`<div class="card" style="border-top-color:#d92d3a">⚠️ <b>Inventory required – form not submitted (${p.length}):</b> ${p.map(t=>e(t.name)+" ("+e(t.tr)+")").join(", ")}. ${U.role=="trainer"?"Please submit the Mentor Requirement Form.":"Track Lead: please follow up with the trainers."}</div>`:""}
 function t2(){return tabs(t2h(),["📊 Dashboard","📝 New Evaluation","📜 Score History","🏆 Leaderboard","⚙️ Rules"],"t2")}
 function evNew(){const n=Math.max(0,...S.ev2.map(z=>+z.id.slice(2)||0))+1;EVD={id:"EV"+String(n).padStart(3,"0"),date:today(),table:"",judge:U.n,team:"",contact:"",mentor:"",age:"",type:"Practice",round:1,insp:{w:"Not Checked",d:"Not Checked",p:"Not Checked"},ch:Array(8).fill("0"),fouls:0,time:"0:00",ptime:"0:00",decl:{rep:"",repSig:"",judgeSig:"",st:"Pending"},st:"Draft",by:U.n,reopen:[]};EVS=0;TB.t2=1;draw()}
 function evEdit(id){EVD=JSON.parse(JSON.stringify(S.ev2.find(x=>x.id==id)));EVS=pt(EVD.time)||0;PVS=pt(EVD.ptime)||0;TB.t2=1;draw()}
