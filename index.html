@@ -574,5 +574,45 @@ function omoIdeaManagementPanel(){
 const omoOriginalIdea=idea;
 idea=function(){return omoOriginalIdea()+omoIdeaManagementPanel()};
 
+
+/* Track 2 operations: submitted progress, inventory log, timers, exports */
+function t2Owner(t){return U.role==='admin'||(U.role==='lead'&&Number(U.trk)===2)|| (U.role==='trainer'&&t.tr===U.n)}
+function t2Review(t){return U.role==='admin'||(U.role==='lead'&&Number(U.trk)===2)}
+function t2ProgressSubmit(id){const t=tm(id);if(!t||t.trk!==2||!t2Owner(t))return toast('Not permitted');
+ const comment=document.getElementById('t2ProgressNote')?.value.trim()||'';
+ const record={id:'TP'+Date.now(),team:id,by:U.n,date:today(),completed:done(t),total:t.s.length,comment,status:'Submitted',reviewBy:'',reviewNote:''};
+ (S.track2Progress=S.track2Progress||[]).push(record);log('Track 2 progress submitted: '+t.name,id);save();toast('Progress submitted for review');draw()}
+function t2ProgressReview(id,status){const r=(S.track2Progress||[]).find(x=>x.id===id);if(!r||!t2Review(tm(r.team)))return toast('Only Track 2 Lead / Super Admin can review');r.status=status;r.reviewBy=U.n;r.reviewNote=document.getElementById('t2Review'+id)?.value||'';log('Track 2 progress '+status,r.team);save();draw()}
+const originalSessT2=sess;
+sess=function(){let h=originalSessT2();const t=tm(TID),T=fT(),current=T.find(x=>x.id===TID)||T[0];if(!current||current.trk!==2)return h;
+ const L=(S.track2Progress||[]).filter(x=>x.team===current.id).slice().reverse();
+ return h+`<div class="card tw"><h3>Track 2 – Submit Track Progress</h3><p>Completed classes: ${done(current)} / ${current.s.length}. Trainers submit a snapshot for Track 2 Lead or Super Admin review.</p>
+ ${t2Owner(current)?`<textarea id="t2ProgressNote" rows="2" style="width:100%" placeholder="Progress summary / technical issues"></textarea><button class="btn o" onclick="t2ProgressSubmit('${current.id}')">Submit Progress</button>`:''}
+ <table><tr><th>Date</th><th>Submitted By</th><th>Sessions</th><th>Remarks</th><th>Status</th><th>Lead/Admin Review</th></tr>${L.map(r=>`<tr><td>${e(r.date)}</td><td>${e(r.by)}</td><td>${r.completed}/${r.total}</td><td>${e(r.comment)}</td><td>${e(r.status)}</td><td>${t2Review(current)&&r.status==='Submitted'?`<input id="t2Review${r.id}" placeholder="Review comments"><button class="btn g" onclick="t2ProgressReview('${r.id}','Approved')">Approve</button><button class="btn r" onclick="t2ProgressReview('${r.id}','Changes Required')">Request Changes</button>`:e(r.reviewNote||r.reviewBy||'—')}</td></tr>`).join('')||'<tr><td colspan="6">No submissions yet</td></tr>'}</table></div>`;
+};
+function t2InventorySave(id){const t=tm(id);if(t.trk!==2||!t2Owner(t))return toast('Not permitted');const date=document.getElementById('t2InvDate'+id)?.value,details=document.getElementById('t2InvDetails'+id)?.value.trim(),note=document.getElementById('t2InvNote'+id)?.value.trim()||'';if(!date||!details)return toast('Enter date and inventory details');
+ (S.track2InventoryLog=S.track2InventoryLog||[]).push({id:'IL'+Date.now(),team:id,date,details,note,by:U.n,submittedAt:new Date().toLocaleString()});log('Track 2 inventory submitted',id);save();toast('Inventory entry submitted');draw()}
+const originalInvT2=inv;
+inv=function(){const base=originalInvT2(),T=fT().filter(t=>t.trk===2);if(!T.length)return base;const L=(S.track2InventoryLog||[]).filter(x=>T.some(t=>t.id===x.team)).slice().reverse();return base+`<div class="card tw"><h3>Track 2 – Inventory Submission & Log</h3><p>Trainer records the inventory date and submits each entry. Previous submissions remain in the log.</p>${T.filter(t=>t2Owner(t)).map(t=>`<div class="card"><b>${e(t.name)} (${e(t.id)})</b><div class="top"><label>Date <input id="t2InvDate${t.id}" type="date" value="${today()}"></label><label>Inventory / requirement details <input id="t2InvDetails${t.id}" placeholder="Items and quantities"></label><label>Remarks <input id="t2InvNote${t.id}" placeholder="Optional"></label><button class="btn o" onclick="t2InventorySave('${t.id}')">Submit Inventory</button></div></div>`).join('')}
+ <table><tr><th>Submission Date</th><th>Team</th><th>Inventory Details</th><th>Remarks</th><th>Submitted By</th><th>Logged At</th></tr>${L.map(x=>`<tr><td>${e(x.date)}</td><td>${e(tm(x.team).name)}</td><td>${e(x.details)}</td><td>${e(x.note)}</td><td>${e(x.by)}</td><td>${e(x.submittedAt)}</td></tr>`).join('')||'<tr><td colspan="6">No inventory submissions yet</td></tr>'}</table></div>`};
+function t2DownloadCsv(name,rows){const data=csv(rows),blob=new Blob([data],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function t2ChallengeExport(){const ids=new Set(vt().filter(t=>t.trk===2).map(t=>t.id));t2DownloadCsv('Track2_Challenge_Results.csv',evCsv(S.ev2.filter(z=>ids.has(z.team))));}
+function t2PracticeExport(){const ids=new Set(vt().filter(t=>t.trk===2).map(t=>t.id));t2DownloadCsv('Track2_Practice_Results.csv',[['Date','Team','Challenge','Round','Turn','Runner','Result','Points','Duration','Feedback','Recorded_By'],...(S.practice2||[]).filter(x=>ids.has(x.team)).map(x=>[x.date,tm(x.team).name,x.challenge,x.round,x.turn,x.runner,x.result,x.points,x.duration,x.feedback,x.by])]);}
+function t2ManualClock(){const m=Number(document.getElementById('prMinutes')?.value||0),sec=Number(document.getElementById('prSeconds')?.value||0);if(!Number.isInteger(m)||!Number.isInteger(sec)||m<0||sec<0||sec>59)return toast('Use valid minutes and seconds (0–59)');prAction('pause');PRACT.sec=m*60+sec;const el=document.getElementById('practiceClock');if(el)el.textContent=prClock(PRACT.sec);toast('Manual time applied')}
+const t2PracticeOriginal=practiceView;
+practiceView=function(){let html=t2PracticeOriginal();html=html.replace('<div class="top" style="margin-top:14px">',`<div class="top" style="justify-content:center"><label>Minutes <input type="number" id="prMinutes" min="0" value="0" style="width:85px"></label><label>Seconds <input type="number" id="prSeconds" min="0" max="59" value="0" style="width:85px"></label><button class="btn o" onclick="t2ManualClock()">Add Manual Time</button><button class="btn g" onclick="t2PracticeExport()">Export Practice CSV</button></div><div class="top" style="margin-top:14px">`);return html;};
+const t2FormOriginal=evForm;
+evForm=function(T){let html=t2FormOriginal(T);html=html.replaceAll('<button class="btn big" onclick="evTm(\'resume\',\'r\')">Resume</button>',`<button class="btn big" onclick="evTm('resume','r')">Resume</button><button class="btn r big" onclick="evTm('stop','r')">Stop</button>`);return html};
+const evTmOriginal=evTm;
+evTm=function(a,w){if(a==='stop'){clearInterval(w==='p'?PVI:EVI);if(w==='p')PVI=null;else EVI=null;toast('Timer stopped');return}return evTmOriginal(a,w)};
+const t2HeadOriginal=t2h;
+t2h=function(){let html=t2HeadOriginal();html=html.replace('<!--S4-->${lb}','<!--S4-->'); // marker may already be interpolated
+ html=html.replace(/<div class="card tw"><h3>(Elementary|Junior|Senior) leaderboard<\/h3>[\s\S]*?<\/table><\/div>/g,'');
+ html=html.replace(/<button class="btn" onclick="TB\.t2=3;draw\(\)">Team Leaderboard<\/button>/g,'');
+ html=html.replace('<!--S3-->',`<!--S3--><div class="top"><button class="btn g" onclick="t2ChallengeExport()">Export Challenge Results CSV</button></div>`);
+ return html;
+};
+t2=function(){const sections=t2h().split(/<!--S\d-->/);sections.splice(4,1);if((TB.t2||0)>4)TB.t2=4;return tabs(sections.join('<!--S1-->'),['📊 Dashboard','📝 New Evaluation','📜 Score History','⚙️ Rules','⚡ Challenge Practice Log'],'t2')};
+
 load();setTh(TH);(async()=>{if(CLOUD){if(!CODE)return codeUI();if(await cloudLoad()){await ensureHashes();loginUI();startPoll()}return}await ensureHashes();loginUI();initSync()})();
 </script></body></html>
