@@ -518,5 +518,60 @@ async function cloudLoad(){try{const r=await gas();if(r.error){CODE=null;try{loc
 function cloudPush(){if(!CODE)return;PEND=1;clearTimeout(CPT);CPT=setTimeout(cloudPushNow,600)}
 async function cloudPushNow(n){n=n||0;try{S.log=(S.log||[]).slice(0,150);const r=await gas({ver:CV,data:S});if(r.error){toast("Access code rejected");PEND=0;return}if(r.conflict){if(n>=3){toast("Could not save – please reload");PEND=0;return}S=BASE?mg(BASE,S,r.data):r.data;CV=r.ver;BASE=cl(r.data);if(U)U=S.users.find(x=>x.n==U.n)||U;return cloudPushNow(n+1)}CV=r.ver;BASE=cl(S);PEND=0}catch(x){PEND=0;toast("Offline – changes not saved")}}
 async function cloudPoll(){if(!CODE||!S||PEND)return;try{const r=await gas();if(r.error||!r.data||r.ver<=CV)return;if(/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||""))return;CV=r.ver;S=r.data;migrate();BASE=cl(S);if(U){U=S.users.find(x=>x.n==U.n)||U;draw()}else loginUI()}catch(x){}}
+
+/* === Super Admin role access + Track 1 idea status management === */
+function omoRoleAdmin(){return U&&U.role==='admin'}
+function omoIdeaLead(){return U&&(U.role==='admin'||(U.role==='lead'&&Number(U.trk)===1))}
+function omoChangeUserRole(index){
+ if(!omoRoleAdmin())return toast('Super Admin access required');
+ const person=S.users[index], role=document.getElementById('omoRole'+index)?.value;
+ const track=Number(document.getElementById('omoTrack'+index)?.value||1);
+ if(!person||!['admin','lead','trainer'].includes(role))return;
+ if(person===U&&role!=='admin')return toast('You cannot remove your own Super Admin access');
+ if(person.role==='admin'&&role!=='admin'&&S.users.filter(x=>x.role==='admin'&&x.st!=='Inactive').length<=1)return toast('Keep at least one active Super Admin');
+ const old=person.role+(person.trk?' Track '+person.trk:'');
+ person.role=role;
+ if(role==='lead')person.trk=track;else delete person.trk;
+ (S.log=S.log||[]).unshift({d:new Date().toLocaleString(),u:U.n,t:'',m:'Access changed: '+person.n+' '+old+' → '+role+(role==='lead'?' Track '+track:'')});
+ save();toast('Access updated for '+person.n);draw();
+}
+function omoUserAccessPanel(){
+ if(!omoRoleAdmin())return '';
+ return `<div class="card tw"><h3>🔐 Super Admin – User Profiles & Access</h3>
+ <p>Promote a trainer to Track Lead, change a lead's assigned track, or grant/revoke Super Admin access. Save each profile separately.</p>
+ <table><tr><th>User</th><th>Current access</th><th>New role</th><th>Lead track</th><th>Action</th></tr>
+ ${S.users.map((u,k)=>`<tr><td>${e(u.n)}<br><small>${e(u.un||'')}</small></td><td>${e(u.role)}${u.role==='lead'?' · Track '+(u.trk||'not set'):''}</td>
+ <td><select id="omoRole${k}" onchange="document.getElementById('omoTrack${k}').disabled=this.value!=='lead'">
+ <option value="trainer" ${u.role==='trainer'?'selected':''}>Trainer</option>
+ <option value="lead" ${u.role==='lead'?'selected':''}>Track Lead</option>
+ <option value="admin" ${u.role==='admin'?'selected':''}>Super Admin</option></select></td>
+ <td><select id="omoTrack${k}" ${u.role==='lead'?'':'disabled'}>${[1,2,3].map(n=>`<option value="${n}" ${Number(u.trk)===n?'selected':''}>Track ${n}</option>`).join('')}</select></td>
+ <td><button class="btn o" onclick="omoChangeUserRole(${k})">Save Access</button></td></tr>`).join('')}</table></div>`;
+}
+const omoOriginalAdm=adm;
+adm=function(){return omoOriginalAdm()+omoUserAccessPanel()};
+function omoIdeaStatus(id){
+ if(!omoIdeaLead())return toast('Track 1 Lead or Super Admin required');
+ const idea=S.ideas.find(i=>i.id===id),next=document.getElementById('omoIdeaStatus'+id)?.value;
+ if(!idea||!['Submitted','Under Review','Changes Required','Approved','Rejected'].includes(next))return;
+ if(idea.team&&next!=='Approved')return toast('Release the idea from its team before changing approval status');
+ const previous=idea.st;idea.st=next;
+ (idea.h=idea.h||[]).push(today()+': status '+previous+' → '+next+' by '+U.n);
+ log('Idea status '+previous+' → '+next+': '+idea.title);
+ save();toast('Idea status changed to '+next);draw();
+}
+function omoIdeaManagementPanel(){
+ if(!omoIdeaLead())return '';
+ return `<div class="card tw"><h3>🛠️ Idea Status & Assignment – Track 1 Lead / Super Admin</h3>
+ <p>Update approval status, then use the assignment controls below to assign an approved idea to a Track 1 team. Release an assigned idea before rejecting it.</p>
+ <table><tr><th>Idea</th><th>Current status</th><th>Assigned team</th><th>Change status</th><th>Save</th></tr>
+ ${S.ideas.map(i=>`<tr><td>${e(i.title)}<br><small>${e(i.theme||'No theme')}</small></td><td>${e(i.st||'Submitted')}</td>
+ <td>${e(S.teams.find(t=>t.id===i.team)?.name||'Not assigned')}</td>
+ <td><select id="omoIdeaStatus${i.id}">${['Submitted','Under Review','Changes Required','Approved','Rejected'].map(st=>`<option ${i.st===st?'selected':''}>${st}</option>`).join('')}</select></td>
+ <td><button class="btn o" onclick="omoIdeaStatus('${i.id}')">Save Status</button></td></tr>`).join('')||'<tr><td colspan="5">No ideas yet</td></tr>'}</table></div>`;
+}
+const omoOriginalIdea=idea;
+idea=function(){return omoOriginalIdea()+omoIdeaManagementPanel()};
+
 load();setTh(TH);(async()=>{if(CLOUD){if(!CODE)return codeUI();if(await cloudLoad()){await ensureHashes();loginUI();startPoll()}return}await ensureHashes();loginUI();initSync()})();
 </script></body></html>
