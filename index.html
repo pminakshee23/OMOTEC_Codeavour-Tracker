@@ -322,7 +322,7 @@ function ev(k,val){if(/^c\d$/.test(k))EVD.ch[+k[1]]=val;else if(k.startsWith("i.
 const sumHTML=()=>{const r=evCalc(EVD);return`<table><tr><th>Challenge points<td><b>${r.ch}</b> / 300<tr><th>Total fouls<td>${EVD.fouls===""?"-":e(EVD.fouls)}<tr><th>Foul penalty (fouls × 10)<td>${r.pen}<tr><th>Total time<td>${e(EVD.time||"-")}<tr><th>Final score<td><b style="font-size:24px">${r.fin}</b></table>`};
 function sumUp(){const d=$("#sum");if(d)d.innerHTML=sumHTML()}
 let PVI=null,PVS=0;
-function evTm(a,w){const r=w!="p";clearInterval(r?EVI:PVI);if(a=="reset"){if(r){EVS=0;EVD.time="0:00"}else{PVS=0;EVD.ptime="0:00"}}let iv=null;if(a=="start"||a=="resume"){if(a=="start"){if(r)EVS=0;else PVS=0}iv=setInterval(()=>{if(r){EVS++;EVD.time=mmss(EVS)}else{PVS++;EVD.ptime=mmss(PVS)}const dd=$(r?"#etm":"#ptm");if(dd)dd.textContent=r?EVD.time:EVD.ptime;if(r){sumUp();const L=c2().dur;if(L&&EVS>=L){clearInterval(EVI);toast("Configured time limit reached")}}},1000)}if(r)EVI=iv;else PVI=iv;if(a=="reset"||a=="pause")draw()}
+function evTm(a,w){if(w==='p'&&a==='start'&&PVS>0)a='resume';const r=w!="p";clearInterval(r?EVI:PVI);if(a=="reset"){if(r){EVS=0;EVD.time="0:00"}else{PVS=0;EVD.ptime="0:00"}}let iv=null;if(a=="start"||a=="resume"){if(a=="start"){if(r)EVS=0;else PVS=0}iv=setInterval(()=>{if(r){EVS++;EVD.time=mmss(EVS)}else{PVS++;EVD.ptime=mmss(PVS)}const dd=$(r?"#etm":"#ptm");if(dd)dd.textContent=r?EVD.time:EVD.ptime;if(r){sumUp();const L=c2().dur;if(L&&EVS>=L){clearInterval(EVI);toast("Configured time limit reached")}}},1000)}if(r)EVI=iv;else PVI=iv;if(a=="reset"||a=="pause")draw()}
 function sgD(e0,k){SG={k,c:e0.target,x:e0.target.getContext("2d"),on:1};const r=SG.c.getBoundingClientRect();SG.x.beginPath();SG.x.moveTo(e0.clientX-r.left,e0.clientY-r.top)}
 function sgM(e0){if(!SG||!SG.on)return;const r=SG.c.getBoundingClientRect();SG.x.lineTo(e0.clientX-r.left,e0.clientY-r.top);SG.x.lineWidth=2;SG.x.stroke()}
 function sgU(){if(!SG)return;SG.on=0;EVD.decl[SG.k]=SG.c.toDataURL("image/png");SG=null;draw()}
@@ -591,17 +591,17 @@ sess=function(){let h=originalSessT2();const t=tm(TID),T=fT(),current=T.find(x=>
  ${t2Owner(current)?`<textarea id="t2ProgressNote" rows="2" style="width:100%" placeholder="Progress summary / technical issues"></textarea><button class="btn o" onclick="t2ProgressSubmit('${current.id}')">Submit Progress</button>`:''}
  <table><tr><th>Date</th><th>Submitted By</th><th>Sessions</th><th>Remarks</th><th>Status</th><th>Lead/Admin Review</th></tr>${L.map(r=>`<tr><td>${e(r.date)}</td><td>${e(r.by)}</td><td>${r.completed}/${r.total}</td><td>${e(r.comment)}</td><td>${e(r.status)}</td><td>${t2Review(current)&&r.status==='Submitted'?`<input id="t2Review${r.id}" placeholder="Review comments"><button class="btn g" onclick="t2ProgressReview('${r.id}','Approved')">Approve</button><button class="btn r" onclick="t2ProgressReview('${r.id}','Changes Required')">Request Changes</button>`:e(r.reviewNote||r.reviewBy||'—')}</td></tr>`).join('')||'<tr><td colspan="6">No submissions yet</td></tr>'}</table></div>`;
 };
-function t2InventorySave(id){const t=tm(id);if(t.trk!==2||!t2Owner(t))return toast('Not permitted');const date=document.getElementById('t2InvDate'+id)?.value,details=document.getElementById('t2InvDetails'+id)?.value.trim(),note=document.getElementById('t2InvNote'+id)?.value.trim()||'';if(!date||!details)return toast('Enter date and inventory details');
- (S.track2InventoryLog=S.track2InventoryLog||[]).push({id:'IL'+Date.now(),team:id,date,details,note,by:U.n,submittedAt:new Date().toLocaleString()});log('Track 2 inventory submitted',id);save();toast('Inventory entry submitted');draw()}
+function t2InventorySave(id){const t=tm(id);if(t.trk!==2||!t2Owner(t))return toast('Not permitted');const date=document.getElementById('t2InvDate'+id)?.value,details=document.getElementById('t2InvDetails'+id)?.value,note=document.getElementById('t2InvNote'+id)?.value.trim()||'';if(!date||!['Yes','No'].includes(details))return toast('Select Yes or No for form submitted');
+ (S.track2InventoryLog=S.track2InventoryLog||[]).push({id:'IL'+Date.now(),team:id,date,details,note,by:U.n,submittedAt:new Date().toLocaleString()});log('Track 2 inventory form '+details,id);save();toast('Form submission recorded');draw()}
 const originalInvT2=inv;
-inv=function(){const base=originalInvT2(),T=fT().filter(t=>t.trk===2);if(!T.length)return base;const L=(S.track2InventoryLog||[]).filter(x=>T.some(t=>t.id===x.team)).slice().reverse();return base+`<div class="card tw"><h3>Track 2 – Inventory Submission & Log</h3><p>Trainer records the inventory date and submits each entry. Previous submissions remain in the log.</p>${T.filter(t=>t2Owner(t)).map(t=>`<div class="card"><b>${e(t.name)} (${e(t.id)})</b><div class="top"><label>Date <input id="t2InvDate${t.id}" type="date" value="${today()}"></label><label>Inventory / requirement details <input id="t2InvDetails${t.id}" placeholder="Items and quantities"></label><label>Remarks <input id="t2InvNote${t.id}" placeholder="Optional"></label><button class="btn o" onclick="t2InventorySave('${t.id}')">Submit Inventory</button></div></div>`).join('')}
- <table><tr><th>Submission Date</th><th>Team</th><th>Inventory Details</th><th>Remarks</th><th>Submitted By</th><th>Logged At</th></tr>${L.map(x=>`<tr><td>${e(x.date)}</td><td>${e(tm(x.team).name)}</td><td>${e(x.details)}</td><td>${e(x.note)}</td><td>${e(x.by)}</td><td>${e(x.submittedAt)}</td></tr>`).join('')||'<tr><td colspan="6">No inventory submissions yet</td></tr>'}</table></div>`};
+inv=function(){const base=originalInvT2(),T=fT().filter(t=>t.trk===2);if(!T.length)return base;const L=(S.track2InventoryLog||[]).filter(x=>T.some(t=>t.id===x.team)).slice().reverse();return base+`<div class="card tw"><h3>Track 2 – Inventory Submission & Log</h3><p>Trainer records the inventory date and submits each entry. Previous submissions remain in the log.</p>${T.filter(t=>t2Owner(t)).map(t=>`<div class="card"><b>${e(t.name)} (${e(t.id)})</b><div class="top"><label>Date <input id="t2InvDate${t.id}" type="date" value="${today()}"></label><label>Form Submitted <select id="t2InvDetails${t.id}"><option value="No">No</option><option value="Yes">Yes</option></select></label><label>Remarks <input id="t2InvNote${t.id}" placeholder="Optional"></label><button class="btn o" onclick="t2InventorySave('${t.id}')">Submit Form Status</button></div></div>`).join('')}
+ <table><tr><th>Submission Date</th><th>Team</th><th>Form Submitted</th><th>Remarks</th><th>Submitted By</th><th>Logged At</th></tr>${L.map(x=>`<tr><td>${e(x.date)}</td><td>${e(tm(x.team).name)}</td><td>${e(x.details)}</td><td>${e(x.note)}</td><td>${e(x.by)}</td><td>${e(x.submittedAt)}</td></tr>`).join('')||'<tr><td colspan="6">No inventory submissions yet</td></tr>'}</table></div>`};
 function t2DownloadCsv(name,rows){const data=csv(rows),blob=new Blob([data],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function t2ChallengeExport(){const ids=new Set(vt().filter(t=>t.trk===2).map(t=>t.id));t2DownloadCsv('Track2_Challenge_Results.csv',evCsv(S.ev2.filter(z=>ids.has(z.team))));}
 function t2PracticeExport(){const ids=new Set(vt().filter(t=>t.trk===2).map(t=>t.id));t2DownloadCsv('Track2_Practice_Results.csv',[['Date','Team','Challenge','Round','Turn','Runner','Result','Points','Duration','Feedback','Recorded_By'],...(S.practice2||[]).filter(x=>ids.has(x.team)).map(x=>[x.date,tm(x.team).name,x.challenge,x.round,x.turn,x.runner,x.result,x.points,x.duration,x.feedback,x.by])]);}
 function t2ManualClock(){const m=Number(document.getElementById('prMinutes')?.value||0),sec=Number(document.getElementById('prSeconds')?.value||0);if(!Number.isInteger(m)||!Number.isInteger(sec)||m<0||sec<0||sec>59)return toast('Use valid minutes and seconds (0–59)');prAction('pause');PRACT.sec=m*60+sec;const el=document.getElementById('practiceClock');if(el)el.textContent=prClock(PRACT.sec);toast('Manual time applied')}
 const t2PracticeOriginal=practiceView;
-practiceView=function(){let html=t2PracticeOriginal();html=html.replace('<div class="top" style="margin-top:14px">',`<div class="top" style="justify-content:center"><label>Minutes <input type="number" id="prMinutes" min="0" value="0" style="width:85px"></label><label>Seconds <input type="number" id="prSeconds" min="0" max="59" value="0" style="width:85px"></label><button class="btn o" onclick="t2ManualClock()">Add Manual Time</button><button class="btn g" onclick="t2PracticeExport()">Export Practice CSV</button></div><div class="top" style="margin-top:14px">`);return html;};
+practiceView=function(){let html=t2PracticeOriginal();html=html.replace('<div class="top" style="margin-top:14px">',`<div class="top" style="justify-content:center"><label>Minutes <input type="number" id="prMinutes" min="0" value="0" style="width:85px"></label><label>Seconds <input type="number" id="prSeconds" min="0" max="59" value="0" style="width:85px"></label><button class="btn o" onclick="t2ManualClock()">Set Stopwatch</button><button class="btn g" onclick="t2PracticeExport()">Export Practice CSV</button></div><div class="top" style="margin-top:14px">`);return html;};
 const t2FormOriginal=evForm;
 evForm=function(T){let html=t2FormOriginal(T);html=html.replaceAll('<button class="btn big" onclick="evTm(\'resume\',\'r\')">Resume</button>',`<button class="btn big" onclick="evTm('resume','r')">Resume</button><button class="btn r big" onclick="evTm('stop','r')">Stop</button>`);return html};
 const evTmOriginal=evTm;
@@ -636,14 +636,54 @@ function robotReview(id,status){const r=(S.robotApprovals||[]).find(x=>x.id===id
  if(status==='Approved'){t.r1='Functional';t.robotApproval='Approved'}else t.robotApproval='Changes Required';
  log('Robot approval '+status+' by '+U.n,r.team);save();toast('Robot approval: '+status);draw();}
 /* Manual practice stopwatch minutes and seconds in evaluation screen */
-function t2SetEvalPracticeTime(){if(!EVD)return;const m=Number(document.getElementById('evalPrMin')?.value),sec=Number(document.getElementById('evalPrSec')?.value);if(!Number.isInteger(m)||m<0||!Number.isInteger(sec)||sec<0||sec>59)return toast('Enter valid minutes and seconds (0–59)');clearInterval(PVI);PVI=null;PVS=m*60+sec;EVD.ptime=mmss(PVS);const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;toast('Practice time set');}
+function t2SetEvalPracticeTime(){
+ if(!EVD)return;
+ const m=Number(document.getElementById('evalPrMin')?.value),sec=Number(document.getElementById('evalPrSec')?.value);
+ if(!Number.isInteger(m)||m<0||!Number.isInteger(sec)||sec<0||sec>59)return toast('Enter valid minutes and seconds (0–59)');
+ clearInterval(PVI);PVI=null;PVS=m*60+sec;EVD.ptime=mmss(PVS);
+ const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;
+ toast('Stopwatch set to '+EVD.ptime+'; press Resume to count upward');
+}
 const robotEvalFormOriginal=evForm;
 evForm=function(T){let h=robotEvalFormOriginal(T);if(!EVD)return h;
- h=h.replace('<div class="card"><h3>Challenges</h3>',`<div class="card"><h3>Practice Timer – Manual Time</h3><div class="top"><label>Minutes <input id="evalPrMin" type="number" min="0" value="${Math.floor(PVS/60)}" style="width:100px"></label><label>Seconds <input id="evalPrSec" type="number" min="0" max="59" value="${PVS%60}" style="width:100px"></label><button class="btn o" onclick="t2SetEvalPracticeTime()">Add Manual Time</button></div><label>Trainer / Judge Comments<textarea id="evalComments" rows="2" style="width:100%" oninput="EVD.comments=this.value">${e(EVD.comments||'')}</textarea></label></div><div class="card"><h3>Challenges</h3>`);
+ h=h.replace('<div class="card"><h3>Challenges</h3>',`<div class="card"><h3>Practice Stopwatch – Set Starting Time</h3><div class="top"><label>Minutes <input id="evalPrMin" type="number" min="0" value="${Math.floor(PVS/60)}" style="width:100px"></label><label>Seconds <input id="evalPrSec" type="number" min="0" max="59" value="${PVS%60}" style="width:100px"></label><button class="btn o" onclick="t2SetEvalPracticeTime()">Set Stopwatch</button></div><label>Trainer / Judge Comments<textarea id="evalComments" rows="2" style="width:100%" oninput="EVD.comments=this.value">${e(EVD.comments||'')}</textarea></label></div><div class="card"><h3>Challenges</h3>`);
  return h;
 };
 const robotEvSaveOriginal=evSave;
 evSave=function(fin){if(EVD)EVD.comments=document.getElementById('evalComments')?.value||EVD.comments||'';return robotEvSaveOriginal(fin)};
+
+
+/* Student-performed Track 2 work, trainer-recorded; stopwatch-only practice */
+const omoPracticeViewPrior=practiceView;
+practiceView=function(){
+ let html=omoPracticeViewPrior();
+ // Practice time must be measured by the running stopwatch, not entered manually.
+ html=html.replace(/<div class="top" style="justify-content:center"><label>Minutes <input type="number" id="prMinutes"[\s\S]*?<button class="btn g" onclick="t2PracticeExport\(\)">Export Practice CSV<\/button><\/div>/,
+ '<div class="top" style="justify-content:center"><button class="btn g" onclick="t2PracticeExport()">Export Practice CSV</button></div>');
+ html=html.replace('Run performed by','Student practice – performed by students, recorded by trainer');
+ html=html.replace(/<label class="btn g big"><input type="radio" name="prRunner" value="Trainer">[^<]*<\/label>/,'');
+ html=html.replace('name="prRunner" value="Student"','name="prRunner" value="Student" checked');
+ html=html.replace('PRACTICE TIMER','STUDENT PRACTICE STOPWATCH');
+ return html;
+};
+// Run stopwatch controls use an actual Stop action and preserve elapsed time.
+const omoEvFormPrior=evForm;
+evForm=function(T){
+ let html=omoEvFormPrior(T);
+ // Ensure both timer panels have a Stop button, regardless of earlier wrappers.
+ html=html.replace(/(<button class="btn big" onclick="evTm\('resume','([pr])'\)">Resume<\/button>)(?!<button class="btn r big" onclick="evTm\('stop','\2'\)">Stop<\/button>)/g,
+ (_,resume,which)=>resume+`<button class="btn r big" onclick="evTm('stop','${which}')">Stop</button>`);
+ return html;
+};
+const omoRobotPanelPrior=robotApprovalPanel;
+robotApprovalPanel=function(t){
+ let html=omoRobotPanelPrior(t);
+ html=html.replace('Robot Approval – Trainer Submission','Student Robot Work – Trainer Submission for Approval');
+ html=html.replace('Trainer submits robot readiness for review. Track 2 Lead or Super Admin reviews and approves only after completion.',
+ 'Students build and test the robot. The assigned trainer records their work and submits the robot status for review. Track 2 Lead or Super Admin approves after completion.');
+ html=html.replace('Robot assembly, sensor testing, challenge readiness, pending issues','Student work completed: assembly, sensor testing, challenge readiness and pending issues');
+ return html;
+};
 
 load();setTh(TH);(async()=>{if(CLOUD){if(!CODE)return codeUI();if(await cloudLoad()){await ensureHashes();loginUI();startPoll()}return}await ensureHashes();loginUI();initSync()})();
 </script></body></html>
