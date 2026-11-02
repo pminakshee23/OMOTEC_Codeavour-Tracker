@@ -459,6 +459,47 @@ idea=function(){
  const assignedHTML=`<div class="card"><h3>🚀 Ideas Used by Track 1 Teams</h3><div class="tw"><table><tr><th>Idea</th><th>Original Creator</th><th>Team</th><th>Project Status</th><th>Details</th></tr>${assigned.map(i=>`<tr><td>${esc2(i.title)}</td><td>${esc2(i.by)}</td><td>${esc2(S.teams.find(t=>t.id===i.team)?.name||i.team)}</td><td>${esc2(i.ps||'Not Started')}</td><td><button class="btn" onclick="ideaPopup('${esc2(i.id)}')">View Idea</button></td></tr>`).join('')||'<tr><td colspan="5">No ideas assigned yet</td></tr>'}</table></div></div>`;
  return html+requestHTML+assignedHTML;
 };
+
+/* === Track 1 Lead / Super Admin idea utilization management === */
+function ideaManageEligibleTeams(){return S.teams.filter(t=>t.trk===1&&!t.arch)}
+function ideaManageAction(id,action){
+ if(!ideaOK())return toast('Only Super Admin and Track 1 Leads can manage idea assignments');
+ const i=S.ideas.find(x=>x.id===id);if(!i)return toast('Idea not found');
+ if(action==='release'){
+  if(!i.team)return toast('Idea is not assigned');
+  if(!confirm('Release this idea from its current team? The team progress will be preserved.'))return;
+  const old=S.teams.find(t=>t.id===i.team),oldId=i.team;
+  if(old&&old.ideaId===i.id){delete old.ideaId;delete old.ideaTheme;delete old.ideaSummary;delete old.ideaDescription;}
+  i.team='';i.ps='Not Started';
+  (i.h=i.h||[]).push(today()+': released from '+(old?.name||oldId)+' by '+U.n);
+  log('Idea released: '+i.title,oldId);save();toast('Idea available for another Track 1 team');draw();return;
+ }
+ const select=document.getElementById('ideaManageTeam'+id);const tid=select?.value,t=S.teams.find(x=>x.id===tid);
+ if(!t||t.trk!==1||t.arch)return toast('Select an active Track 1 team');
+ if(i.st!=='Approved')return toast('Only approved ideas can be assigned');
+ if(i.team===tid)return toast('Idea is already assigned to this team');
+ if(S.ideas.some(x=>x.id!==id&&x.team===tid&&x.ps!=='Completed'))return toast('Target team already has an active idea');
+ if(i.team){
+  if(!confirm('Move this idea to '+t.name+'? Existing team progress will be preserved.'))return;
+  const old=S.teams.find(x=>x.id===i.team),oldId=i.team;
+  if(old&&old.ideaId===i.id){delete old.ideaId;delete old.ideaTheme;delete old.ideaSummary;delete old.ideaDescription;}
+  i.team=tid;t.ideaId=i.id;t.ideaTheme=i.theme||'';t.ideaSummary=i.summary||i.sol||'';
+  t.ideaDescription=[i.title,i.summary||i.sol].filter(Boolean).join(' – ');
+  i.trainer=t.tr;i.ad=today();
+  (i.h=i.h||[]).push(today()+': reassigned from '+(old?.name||oldId)+' to '+t.name+' by '+U.n);
+  log('Idea reassigned to '+t.name,tid);save();toast('Idea transferred to '+t.name);draw();return;
+ }
+ assignIdea(id,tid);
+}
+const _ideaWithUsage=idea;
+idea=function(){
+ let html=_ideaWithUsage();if(!ideaOK())return html;
+ const teams=ideaManageEligibleTeams(),ideas=S.ideas.filter(i=>i.st==='Approved'||i.team);
+ const panel=`<div class="card"><h3>🎯 Idea Assignment & Utilization – Admin / Track 1 Lead</h3><p>Assign approved ideas, transfer them between Track 1 teams, or release them for reuse. The original creator and assignment history remain recorded.</p><div class="tw"><table><tr><th>Idea / Theme</th><th>Creator</th><th>Current Team</th><th>Choose Team</th><th>Actions</th></tr>${ideas.map(i=>{const current=teams.find(t=>t.id===i.team);const eligible=teams.filter(t=>t.id===i.team||!S.ideas.some(x=>x.id!==i.id&&x.team===t.id&&x.ps!=='Completed'));return `<tr><td><b>${esc2(i.title)}</b><br><small>${esc2(i.theme||'No theme')}</small></td><td>${esc2(i.by||'')}</td><td>${esc2(current?.name||i.team||'Not assigned')}</td><td><select id="ideaManageTeam${esc2(i.id)}"><option value="">Select Track 1 team</option>${eligible.map(t=>`<option value="${esc2(t.id)}" ${i.team===t.id?'selected':''}>${esc2(t.name)} · ${esc2(t.br)}</option>`).join('')}</select></td><td><button class="btn o" onclick="ideaManageAction('${esc2(i.id)}','assign')">${i.team?'Transfer':'Assign'}</button> ${i.team?`<button class="btn r" onclick="ideaManageAction('${esc2(i.id)}','release')">Release</button>`:''} <button class="btn" onclick="ideaPopup('${esc2(i.id)}')">View</button></td></tr>`}).join('')||'<tr><td colspan="5">No approved ideas available</td></tr>'}</table></div></div>`;
+ return html+panel;
+};
+/* === End idea utilization management === */
+
 /* === End Track 1 Idea Bank usage workflow === */
 
 /* === End Codeavour additions === */
