@@ -233,27 +233,25 @@ function canIqField(t,f){
 function setIq(id,f,val){
  const t=S.teams.find(x=>x.id===id);if(!t||!canIqField(t,f))return toast("You do not have permission to edit this field");
  const q=iqf(t);
- if(f==="sub"&&val==="Yes"&&(!q.date||!q.ref)){toast("Enter submission date and reference link first");return draw()}
+ 
  q[f]=val;
  log("Inventory requirement "+f+" → "+val,id);save();draw();
 }
 function inv(){return invReq()}
 function invReq(){
  const T=fT();
- const fields=["req","sub","date","ref","ap","rc","pend","exp","deadline","rm"];
- const sel=(t,q,k,opts)=>`<select ${canIqField(t,k)?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)">${opts.map(o=>`<option ${q[k]===o?"selected":""}>${o}</option>`).join("")}</select>`;
- const inp=(t,q,k,type="text")=>`<input type="${type}" value="${e(q[k]||"")}" ${canIqField(t,k)?"":"disabled"} onchange="setIq('${t.id}','${k}',this.value)" style="width:${type==="date"?130:125}px">`;
- return `<h2>Inventory Management</h2><div class="card"><b>Separate responsibilities:</b> Trainers submit requirements, dates, links and remarks. Track Leads review approvals, inventory receipt and deadlines. Super Admin can edit all fields.<br><br><button class="btn o big" onclick="window.open('${IQU}','_blank','noopener')">Open Inventory Requirement Form</button></div><div class="card tw"><h3>Requirement tracking</h3><table><tr><th>Team<th>Track<th>Branch<th>Trainer<th>Required<th>Submitted (manual confirm)<th>Date<th>Reference link<th>Approval<th>Received<th>Pending items<th>Expected delivery<th>Requirement deadline<th>Remarks<th>Alert</tr>${T.map(t=>{
- const q=iqf(t),n=done(t),canAlert=U.role==="admin"||(U.role==="lead"&&t.trk==U.trk);
- const alert=n<3?"No flags before 3 classes":q.req==="Yes"&&q.sub!=="Yes"?(canAlert?`<button class="btn o" onclick="alertInventoryRequirement('${t.id}')">Alert: Requirement form pending</button>`:"Requirement form pending – lead notified"):q.req==="Yes"&&q.rc!=="Yes"?"Awaiting inventory":"OK";
- return `<tr><td>${e(t.name)} (${t.id})<td>T${t.trk}<td>${e(t.br)}<td>${e(t.tr)}<td>${sel(t,q,"req",["Yes","No"])}<td>${sel(t,q,"sub",["No","Yes"])}<td>${inp(t,q,"date","date")}<td>${inp(t,q,"ref")}<td>${sel(t,q,"ap",["Pending","Under Review","Approved","Rejected"])}<td>${sel(t,q,"rc",["No","Yes"])}<td>${inp(t,q,"pend")}<td>${inp(t,q,"exp","date")}<td>${inp(t,q,"deadline","date")}<td>${inp(t,q,"rm")}<td>${alert}</tr>`;
- }).join("")}</table></div>`;
+ const submitted=(t,q)=>`<select ${canIqField(t,"sub")?"":"disabled"} onchange="setIq('${t.id}','sub',this.value)"><option value="No" ${q.sub!=="Yes"?"selected":""}>No</option><option value="Yes" ${q.sub==="Yes"?"selected":""}>Yes</option></select>`;
+ const deadline=(t,q)=>`<input type="date" value="${e(q.deadline||"")}" ${canIqField(t,"deadline")?"":"disabled"} onchange="setIq('${t.id}','deadline',this.value)">`;
+ const pending=T.filter(t=>done(t)>=3&&iqf(t).sub!=="Yes");
+ return `<h2>Inventory Management</h2><div class="card"><b>Inventory Requirement Form</b><p>Trainer confirms form submission. Track Lead or Super Admin sets the deadline. No inventory requirement alert is available before 3 completed classes.</p><button class="btn o big" onclick="window.open('${IQU}','_blank','noopener')">Open Inventory Requirement Form</button></div>
+ <div class="card tw"><h3>Requirement Tracking</h3><table><tr><th>Team Name</th><th>Track</th><th>Branch</th><th>Trainer</th><th>Form Submitted</th><th>Deadline Date</th></tr>${T.map(t=>{const q=iqf(t);return `<tr><td>${e(t.name)}</td><td>Track ${t.trk}</td><td>${e(t.br)}</td><td>${e(t.tr)}</td><td>${submitted(t,q)}</td><td>${deadline(t,q)}</td></tr>`}).join("")}</table></div>
+ ${pending.length?`<div class="card tw"><h3>Inventory Form Alerts (3+ completed classes)</h3>${pending.map(t=>{const canAlert=U.role==="admin"||(U.role==="lead"&&t.trk==U.trk);return `<div style="margin:8px 0">${e(t.name)} — ${e(t.tr)} ${canAlert?`<button class="btn o" onclick="alertInventoryRequirement('${t.id}')">Send Alert</button>`:"— Form pending"}</div>`}).join("")}</div>`:""}`;
 }
 function alertInventoryRequirement(id){
  const t=tm(id),q=iqf(t);
  if(U.role!=="admin"&&!(U.role==="lead"&&t.trk==U.trk))return toast("Only Admin or assigned Track Lead can send inventory alerts");
  if(done(t)<3)return toast("Alerts begin after 3 completed classes");
- if(q.req!=="Yes"||q.sub==="Yes")return toast("No outstanding requirement form for this team");
+ if(q.sub==="Yes")return toast("Requirement form already submitted for this team");
  const existing=S.fl.find(f=>f.team===id&&f.cat==="Inventory Requirement"&&f.st!=="Closed");
  if(existing)return toast("Inventory reminder already flagged");
  S.fl.push({id:"F"+Date.now(),team:id,cat:"Inventory Requirement",sev:"Orange",issue:"Inventory requirement form needed; trainer to submit requirement",who:t.tr,act:"Submit inventory requirement form",due:q.deadline||"",st:"Open"});
