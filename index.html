@@ -88,7 +88,7 @@ const q=iqf(t),late=d>=(S.CFG.iqd[t.trk]||10);if(d>=3&&q.req=="Yes"&&q.sub!="Yes
 if(t.trk==2)T2F(t,d,add)});
 S.ideas.forEach(i=>{if(stg(i)>=0&&stg(i)<3){const ds=Math.floor((Date.now()-new Date(((i.h&&i.h.length?i.h[i.h.length-1].slice(0,10):i.d)||i.d)+"T12:00:00"))/864e5);if(ds>=(S.CFG.ideaDays||7))o.push({id:"A-idea-"+i.id,team:"",trk:1,cat:"Idea Review Overdue",sev:ds>=14?"Red":"Orange",issue:i.title+" waiting "+ds+" days for review",who:(S.users.find(u=>u.role=="lead"&&u.trk==1)||{}).n||"Track 1 Lead",st:"Auto",due:"",auto:1})}});
 S.teams.filter(t=>t.trk==1&&!t.arch).forEach(t=>{const a=S.ideas.find(i=>i.team==t.id);if(a&&(a.ps||"Not Started")=="Not Started"&&done(t)>=13)o.push({id:"A-dev-"+t.id,team:t.id,cat:"Project Development",sev:"Orange",issue:"Assigned idea not started: "+a.title,who:t.tr,st:"Auto",due:"",auto:1})});
-const man=S.fl.filter(f=>f.st!="Closed"&&f.st!="Resolved"&&(!f.team||done(tm(f.team))>=3));return o.filter(a=>!a.team||done(tm(a.team))>=3).filter(a=>!man.some(f=>f.team==a.team&&f.cat==a.cat)).concat(man)}
+const man=S.fl.filter(f=>f.st!="Closed"&&(!f.team||done(tm(f.team))>=3));return o.filter(a=>!a.team||done(tm(a.team))>=3).filter(a=>!man.some(f=>f.team==a.team&&f.cat==a.cat)).concat(man)}
 const tsev=(t,F)=>Object.keys(SEV).find(k=>SEV[k]==Math.max(0,...F.filter(f=>f.team==t.id).map(f=>SEV[f.sev]))),tp=t=>S.inv.filter(i=>i.team==t.id).reduce((a,i)=>a+pend(i),0),wkok=t=>wst(t)<=0;
 const ready=(t,F)=>prog(t)>=90&&(t.trk==3||t.ap=="Approved")&&!F.some(f=>f.team==t.id&&SEV[f.sev]>=2)&&tp(t)==0;
 function csv(r){return"\ufeff"+r.map(a=>a.map(c=>{c=c==null?"":String(c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(",")).join("\r\n")}
@@ -158,22 +158,7 @@ function invT(L,ed){return`<table><tr><th>Component<th>Team<th>Branch<th>Require
 function inv0(){const T=vt(),ids=T.map(t=>t.id),L=S.inv.filter(i=>(!TS||i.trk==TS)&&(!FB||i.br==FB)&&(i.team?ids.includes(i.team):U.role=="admin"||U.role=="lead"||1)),ed=U.role!="trainer";
 const sm=f=>L.reduce((a,i)=>a+f(i),0);return`<div class="grid">${[["Total Required",sm(i=>i.req)],["Available",sm(i=>i.av)],["Issued",sm(i=>i.is)],["Pending",sm(pend)],["Critical Shortages",L.filter(i=>pend(i)>0&&i.av<i.req).length],["Faulty",sm(i=>i.fa)]].map(k=>`<div class="card k"><b>${k[1]}</b><span>${k[0]}</span></div>`).join("")}</div>${ed?`<div class="card"><h3>Add item</h3><div class="top"><select id="it"><option value="">Shared (branch)</option>${T.map(t=>`<option value="${t.id}">${e(t.name)}</option>`).join("")}</select><select id="ib">${S.br.map(b=>`<option>${b}</option>`).join("")}</select><input id="ic" placeholder="Component"><input id="iq" type="number" placeholder="Required" style="width:90px"><button class="btn o" onclick="addI()">Add</button></div></div>`:""}<div class="card tw">${invT(L,ed)}</div>`}
 function addI(){const c=v("ic").trim(),q=+v("iq");if(!c||!q)return toast("Component and quantity required");const t=v("it"),k=t?tm(t).trk:(TS||3),b=t?tm(t).br:v("ib");if(S.inv.some(i=>i.team==t&&i.comp.toLowerCase()==c.toLowerCase()&&i.br==b))return toast("Item already exists");S.inv.push({id:"INV"+Date.now()%1e6,trk:k,br:b,team:t,comp:c,req:q,av:0,is:0,fa:0,resp:U.n,date:""});log("Inventory added: "+c,t);draw()}
-function resolveFlag(id){
- const f=S.fl.find(x=>x.id===id);if(!f)return toast('Flag not found');
- const t=f.team?tm(f.team):null;
- if(!(U.role==='admin'||(U.role==='trainer'&&t&&t.tr===U.n)||(U.role==='lead'&&t&&t.trk===U.trk)))return toast('Access denied');
- if(f.st==='Resolved'||f.st==='Closed')return toast('Already resolved');
- const note=prompt('Resolution remarks (required):');if(note===null)return;if(!note.trim())return toast('Please enter resolution remarks');
- f.st='Resolved';f.resolvedBy=U.n;f.resolvedAt=new Date().toISOString();f.resolution=note.trim();
- log('Flag resolved: '+f.cat+' — '+note.trim(),f.team);toast('Flag marked Resolved');draw();
-}
-function flags(){
- const visible=S.fl.filter(f=>f.team?vt().some(t=>t.id===f.team):(U.role==='admin'||(U.role==='lead'&&U.trk===1)));
- const auto=AF().filter(f=>f.auto&& (f.team?vt().some(t=>t.id===f.team):(U.role==='admin'||(U.role==='lead'&&U.trk===1))));
- const F=[...auto,...visible];
- return `<h2>Red Flags</h2><div class="card"><h3>Add flag</h3><div class="top"><select id="ft">${vt().map(t=>`<option value="${t.id}">${e(t.name)}</option>`).join('')}</select><select id="fc">${FC.map(c=>`<option>${c}</option>`).join('')}</select><select id="fs">${['Yellow','Orange','Red'].map(c=>`<option>${c}</option>`).join('')}</select><input id="fi" placeholder="Issue"><input id="fa" placeholder="Corrective action"><input id="fw" placeholder="Responsible"><input id="fd" type="date"><button class="btn o" onclick="addF()">Add</button></div></div>
- <div class="card tw"><h3>Flags & Resolution</h3><table><tr><th>Level</th><th>Track</th><th>Team</th><th>Category</th><th>Issue</th><th>Responsible</th><th>Deadline</th><th>Status</th><th>Resolution</th></tr>${F.map(f=>{const t=f.team?tm(f.team):null;const allowed=!f.auto&&(U.role==='admin'||(U.role==='trainer'&&t&&t.tr===U.n)||(U.role==='lead'&&t&&t.trk===U.trk));return `<tr><td>${pill(f.sev,f.sev)}</td><td>T${f.trk||(t?t.trk:1)}</td><td>${t?e(t.name):'All Ideas'}</td><td>${e(f.cat)}</td><td>${e(f.issue)}</td><td>${e(f.who)}</td><td>${e(f.due||'-')}</td><td>${e(f.st)}</td><td>${f.auto?'Automatic — fix underlying issue':f.st==='Resolved'||f.st==='Closed'?`<small>${e(f.resolution||'Resolved')}<br>${e(f.resolvedBy||'')} ${e(f.resolvedAt||'')}</small>`:allowed?`<button class="btn o" onclick="resolveFlag('${f.id}')">Mark Resolved</button>`:'View only'}</td></tr>`}).join('')||'<tr><td colspan="9">No flags</td></tr>'}</table></div>`;
-}
+function flags(){const F=AF().filter(f=>f.team?vt().some(t=>t.id==f.team):(U.role=="admin"||(U.role=="lead"&&U.trk==1)));return`<h2>Red Flags</h2><div class="card"><h3>Add flag</h3><div class="top"><select id="ft">${vt().map(t=>`<option value="${t.id}">${e(t.name)}</option>`).join("")}</select><select id="fc">${FC.map(c=>`<option>${c}</option>`).join("")}</select><select id="fs">${["Yellow","Orange","Red"].map(c=>`<option>${c}</option>`).join("")}</select><input id="fi" placeholder="Issue"><input id="fa" placeholder="Corrective action"><input id="fw" placeholder="Responsible"><input id="fd" type="date"><button class="btn o" onclick="addF()">Add</button></div></div><div class="card tw"><table><tr><th>Level<th>Track<th>Team<th>Category<th>Issue<th>Responsible<th>Action<th>Deadline<th>Status</tr>${F.map(f=>`<tr><td>${pill(f.sev,f.sev)}<td>T${f.trk||tm(f.team).trk}<td>${f.team?e(tm(f.team).name):"All Ideas"}<td>${e(f.cat)}<td>${e(f.issue)}<td>${e(f.who)}<td>${e(f.act||"-")}<td>${f.due||"-"}<td>${f.auto?"Auto (clears when fixed)":`<select onchange="S.fl.find(x=>x.id=='${f.id}').st=this.value;log('Flag ${f.id} → '+this.value,'${f.team}');draw()">${WF.map(w=>`<option ${w==f.st?"selected":""}>${w}</option>`).join("")}</select>`}</tr>`).join("")||"<tr><td>No flags"}</table></div>`}
 function addF(){const t=v("ft"),c=v("fc");if(!v("fi"))return toast("Describe the issue");if(AF().some(f=>f.team==t&&f.cat==c))return toast("Active flag already exists");S.fl.push({id:"F"+Date.now()%1e6,team:t,cat:c,sev:v("fs"),issue:v("fi"),who:v("fw")||tm(t).tr,act:v("fa"),due:v("fd"),st:"Open"});log("Flag added: "+c,t);draw()}
 function perf(){const T=fT();if(!T.length)return"<h2>Student Performance</h2><p>No teams.</p>";const t=T.find(x=>x.id==TID)||T[0],K=SK[t.trk],pc=a=>{const s=a.sc.filter(x=>x!=null);return s.length?R(s.reduce((x,y)=>x+y,0)/(s.length*10)*100):0};
 return`<h2>Student Performance</h2><div class="top"><select onchange="TID=this.value;draw()">${T.map(x=>`<option value="${x.id}" ${x.id==t.id?"selected":""}>${e(x.name)}</option>`).join("")}</select></div><div class="card tw"><table><tr><th>Student<th>Grade<th>Latest score<th>History</tr>${t.st.map(s=>`<tr><td>${e(s.n)}<td>${e(s.g)}<td>${s.as.length?pc(s.as[s.as.length-1])+"% ("+s.as[s.as.length-1].sc.filter(x=>x!=null).length+" skills)":"-"}<td>${s.as.map(pc).join(" → ")||"-"}</tr>`).join("")}</table></div>${canE(t)?`<div class="card"><h3>New assessment (blank = Not Assessed)</h3><select id="pa">${t.st.map((s,i)=>`<option value="${i}">${e(s.n)}</option>`).join("")}</select> ${K.map((k,i)=>`<label>${k} <input id="pk${i}" type="number" min="0" max="10" style="width:56px"></label>`).join(" ")} <button class="btn o" onclick="saveP('${t.id}')">Save</button></div>`:""}`}
@@ -709,6 +694,36 @@ inv=function(){
  <div style="overflow-x:auto"><table><tr><th>Team</th><th>Track</th><th>Branch</th><th>Trainer</th><th>Form Submitted</th><th>Date</th><th>Action</th></tr>
  ${T.map(t=>{const q=iqf(t), allowed=U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)||(U.role==='lead'&&Number(U.trk)===Number(t.trk));return `<tr><td>${e(t.name)}</td><td>Track ${t.trk}</td><td>${e(t.br)}</td><td>${e(t.tr)}</td><td><select id="omoSub${t.id}" ${allowed?'':'disabled'}><option value="No" ${q.sub!=='Yes'?'selected':''}>No</option><option value="Yes" ${q.sub==='Yes'?'selected':''}>Yes</option></select></td><td><input type="date" id="omoDate${t.id}" value="${e(q.date||today())}" ${allowed?'':'disabled'}></td><td>${allowed?`<button class="btn o" onclick="omoSubmissionSave('${t.id}')">Submit</button>`:'View only'}</td></tr>`}).join('')}</table></div></div>
  <div class="card tw"><h3>Previous Submissions</h3><div style="overflow-x:auto"><table><tr><th>Team</th><th>Form Submitted</th><th>Date</th><th>Submitted By</th><th>Logged At</th></tr>${L.map(x=>`<tr><td>${e(S.teams.find(t=>t.id===x.team)?.name||x.team)}</td><td>${e(x.submitted)}</td><td>${e(x.date)}</td><td>${e(x.by)}</td><td>${e(x.at)}</td></tr>`).join('')||'<tr><td colspan="5">No submissions recorded yet.</td></tr>'}</table></div></div>`;
+};
+/* Inventory submission log: resolve/reopen and remove entries. */
+function omoLogAllowed(entry){
+ const t=S.teams.find(x=>x.id===entry.team);
+ return !!(U&&t&&(U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)||(U.role==='lead'&&Number(U.trk)===Number(t.trk))));
+}
+function omoLogAction(index,action){
+ const L=S.inventorySubmissionLog||[],entry=L[index];
+ if(!entry||!omoLogAllowed(entry))return toast('Not authorized');
+ if(action==='remove'){
+  if(!confirm('Remove this submission log entry? This cannot be undone.'))return;
+  L.splice(index,1);
+ }else if(action==='resolve'){
+  entry.resolved=true;entry.resolvedBy=U.n;entry.resolvedAt=new Date().toLocaleString();
+ }else if(action==='reopen'){
+  entry.resolved=false;entry.resolvedBy='';entry.resolvedAt='';
+ }else return;
+ log('Inventory submission '+action+'d: '+entry.team,entry.team);
+ save();toast('Submission log updated');draw();
+}
+const omoSimpleInv=inv;
+inv=function(){
+ let html=omoSimpleInv();
+ const T=fT(),L=(S.inventorySubmissionLog||[]);
+ const rows=L.map((entry,index)=>({entry,index})).filter(x=>T.some(t=>t.id===x.entry.team)).reverse();
+ const start=html.indexOf('<div class="card tw"><h3>Previous Submissions</h3>');
+ if(start<0)return html;
+ html=html.slice(0,start);
+ return html+`<div class="card tw"><h3>Previous Submissions</h3><div style="overflow-x:auto"><table><tr><th>Team</th><th>Form Submitted</th><th>Date</th><th>Submitted By</th><th>Logged At</th><th>Status</th><th>Action</th></tr>
+ ${rows.map(({entry:x,index})=>`<tr><td>${e(S.teams.find(t=>t.id===x.team)?.name||x.team)}</td><td>${e(x.submitted)}</td><td>${e(x.date)}</td><td>${e(x.by)}</td><td>${e(x.at)}</td><td>${x.resolved?'Resolved':'Open'}</td><td>${omoLogAllowed(x)?`${x.resolved?`<button class="btn o" onclick="omoLogAction(${index},'reopen')">Reopen</button>`:`<button class="btn o" onclick="omoLogAction(${index},'resolve')">Resolve</button>`} <button class="btn o" onclick="omoLogAction(${index},'remove')">Remove</button>`:'View only'}</td></tr>`).join('')||'<tr><td colspan="7">No submissions recorded yet.</td></tr>'}</table></div></div>`;
 };
 let omoTimerEndAt=0,omoTimerAudio=null;
 function omoAlarm(){
