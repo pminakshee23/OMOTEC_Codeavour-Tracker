@@ -92,7 +92,7 @@ const man=S.fl.filter(f=>f.st!="Closed"&&(!f.team||done(tm(f.team))>=3));return 
 const tsev=(t,F)=>Object.keys(SEV).find(k=>SEV[k]==Math.max(0,...F.filter(f=>f.team==t.id).map(f=>SEV[f.sev]))),tp=t=>S.inv.filter(i=>i.team==t.id).reduce((a,i)=>a+pend(i),0),wkok=t=>wst(t)<=0;
 const ready=(t,F)=>prog(t)>=90&&(t.trk==3||t.ap=="Approved")&&!F.some(f=>f.team==t.id&&SEV[f.sev]>=2)&&tp(t)==0;
 function csv(r){return"\ufeff"+r.map(a=>a.map(c=>{c=c==null?"":String(c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(",")).join("\r\n")}
-function loginUI(){$("#root").innerHTML=`<div id="login"><div class="card"><img src="${LOGO}" style="width:100%;border-radius:12px;margin-bottom:8px"><div style="font-size:34px">🤖⚽💡</div><h2 style="color:var(--o);margin:0">OMOTEC Codeavour Tracker</h2><p style="color:var(--mu)">Codeavour 8.0 – Competition Management System<br>by OMOTEC</p><p><select id="lu" style="width:100%">${S.users.filter(u=>u.st!="Inactive").map(u=>`<option value="${e(u.n)}">${e(u.n)} (${rl(u)})</option>`).join("")}</select></p><p><input id="lp" type="password" placeholder="Password" style="width:100%"><label style="font-size:12px"><input type="checkbox" onchange="$('#lp').type=this.checked?'text':'password'"> Show password</label></p><button class="btn o" style="width:100%" onclick="doLogin()">Login</button></div></div>`}
+function loginUI(){$("#root").innerHTML=`<div id="login"><div class="card"><img src="${LOGO}" style="width:100%;border-radius:12px;margin-bottom:8px"><div style="font-size:34px">🤖⚽💡</div><h2 style="color:var(--o);margin:0">OMOTEC Codeavour Tracker</h2><p style="color:var(--mu)">Codeavour 8.0 – Competition Management System<br>by OMOTEC</p><p><select id="lu" style="width:100%">${S.users.filter(u=>u.st!="Inactive").map(u=>`<option value="${e(u.n)}">${e(u.n)} (${rl(u)})</option>`).join("")}</select></p><p><input id="lp" type="password" placeholder="Password" style="width:100%"><label style="font-size:12px"><input type="checkbox" onchange="$('#lp').type=this.checked?'text':'password'"> Show password</label></p><button class="btn o" style="width:100%" onclick="doLogin()">Login</button><p style="font-size:12px;color:var(--mu)">SIMULATED LOGIN – demo only, not secure. Demo password for seeded accounts: demo1234.</p></div></div>`}
 
 const NAV=[["dash","🏠 Dashboard"],["teams","🤖 Team Management"],["sess","📚 Session Tracking"],["weekly","📝 Weekly Updates"],["inv","📦 Inventory Management"],["flags","🚩 Red Flags"],["idea","💡 Idea Bank",[0,1]],["t2","🏆 Track 2 Scores",[0,2]],["appr","✅ Ideation & Approval",[0,1,2]],["match","⚽ Match Management",[0,3]],["rep","📊 Reports & Analytics"],["adm","⚙️ Admin & Data","admin"]];
 function shell(){$("#root").innerHTML=`<div id="app"><nav><img src="${LOGO}" style="width:100%;border-radius:10px;margin-bottom:8px"><h2>OMOTEC Codeavour Tracker</h2><small>Codeavour 8.0</small>${NAV.filter(n=>!n[2]||(n[2]=="admin"?U.role=="admin":n[2].includes(TS))).map(n=>`<button class="${V==n[0]?"on":""}" onclick="V='${n[0]}';TID=null;shell()">${n[1]}</button>`).join("")}<div class="mascot"><div style="font-size:30px">🤖⚽</div>Build • Code • Play • Win!</div></nav><main><div class="hero"><div><b>OMOTEC Codeavour Tracker</b><br>Innovation • Line Follower • Robo Soccer</div><span class="mc">🤖⚽💡🏆</span></div><div class="tabs">${[[0,"🌈 All Tracks"],[1,"💡 Track 1 · Innovation"],[2,"🏁 Track 2 · Clean Energy AI-Robo"],[3,"⚽ Track 3 · Robo Soccer"]].filter(x=>U.role!="lead"||x[0]==U.trk).map(x=>`<button class="tab ${TS==x[0]?"on":""}" onclick="setTS(${x[0]})">${x[1]}</button>`).join("")}</div><div class="top"><b>Filters:</b><input placeholder="Search teams" value="${e(Q)}" oninput="Q=this.value;draw()"><select onchange="FB=this.value;draw()"><option value="">All branches</option>${S.br.map(b=>`<option ${FB==b?"selected":""}>${b}</option>`).join("")}</select><span class="sp"></span><select onchange="setTh(this.value)">${[["pastel","🎨 Pastel"],["omotec","🟠 OMOTEC"],["pitch","⚽ Pitch"],["neon","🤖 Neon Robot"],["sunset","🌅 Sunset"]].map(x=>`<option value="${x[0]}" ${TH==x[0]?"selected":""}>${x[1]}</option>`).join("")}</select><button class="btn g" onclick="V='pw';shell()">Change password</button><span>${e(U.n)} (${rl(U)})</span><button class="btn g" onclick="U=null;loginUI()">Logout</button></div><div id="m"></div></main></div>`;draw()}
@@ -646,33 +646,42 @@ const robotEvSaveOriginal=evSave;
 evSave=function(fin){if(EVD)EVD.comments=document.getElementById('evalComments')?.value||EVD.comments||'';return robotEvSaveOriginal(fin)};
 
 
-/* Simple Track 2 practice countdown: trainer sets minutes, then starts/stops. */
-let omoCountdownInitial=120;
-function omoCountdownSet(){
- const m=Number(document.getElementById('omoCountdownMinutes')?.value);
- if(!Number.isFinite(m)||m<=0||m>180)return toast('Enter minutes between 1 and 180');
- if(PRACT.iv)clearInterval(PRACT.iv);PRACT.iv=null;
- omoCountdownInitial=Math.round(m*60);PRACT.sec=omoCountdownInitial;
- const el=document.getElementById('practiceClock');if(el)el.textContent=prClock(PRACT.sec);
+/* === Nov 3: inventory submission log only; practice countdown === */
+function omoSubmissionSave(id){
+ const t=S.teams.find(x=>x.id===id);if(!t)return;
+ if(!(U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)||(U.role==='lead'&&Number(U.trk)===Number(t.trk))))return toast('Not authorized for this team');
+ const status=document.getElementById('omoSub'+id)?.value,date=document.getElementById('omoDate'+id)?.value;
+ if(!['Yes','No'].includes(status)||!date)return toast('Select Yes or No and a date');
+ const q=iqf(t);q.sub=status;q.date=date;
+ (S.inventorySubmissionLog=S.inventorySubmissionLog||[]).push({team:id,submitted:status,date,by:U.n,at:new Date().toLocaleString()});
+ log('Inventory form submission: '+status+' ('+date+')',id);save();toast('Submission saved');draw();
 }
-function omoCountdownAction(action){
- if(action==='reset'){if(PRACT.iv)clearInterval(PRACT.iv);PRACT.iv=null;PRACT.sec=omoCountdownInitial}
- if(action==='stop'){if(PRACT.iv)clearInterval(PRACT.iv);PRACT.iv=null}
- if(action==='start'){
-  if(PRACT.iv)clearInterval(PRACT.iv);
-  if(PRACT.sec<=0)PRACT.sec=omoCountdownInitial;
-  PRACT.iv=setInterval(()=>{
-   PRACT.sec=Math.max(0,PRACT.sec-1);
-   const el=document.getElementById('practiceClock');if(el)el.textContent=prClock(PRACT.sec);
-   if(PRACT.sec===0){clearInterval(PRACT.iv);PRACT.iv=null;toast('Practice time completed')}
-  },1000);
- }
- const el=document.getElementById('practiceClock');if(el)el.textContent=prClock(PRACT.sec);
+inv=function(){
+ const T=fT(),L=(S.inventorySubmissionLog||[]).filter(x=>T.some(t=>t.id===x.team)).slice().reverse();
+ return `<h2>📦 Inventory – Submission Log</h2><div class="card"><h3>Inventory Form Submission</h3><p>Only record whether the form was submitted and the date. No requirement tracking, approval, delivery fields, or automatic inventory red flags.</p>
+ <table><tr><th>Team</th><th>Track</th><th>Branch</th><th>Trainer</th><th>Submitted Form</th><th>Date</th><th>Action</th></tr>
+ ${T.map(t=>{const q=iqf(t),allowed=U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)||(U.role==='lead'&&Number(U.trk)===Number(t.trk));return `<tr><td>${e(t.name)}</td><td>Track ${t.trk}</td><td>${e(t.br)}</td><td>${e(t.tr)}</td><td><select id="omoSub${t.id}" ${allowed?'':'disabled'}><option value="No" ${q.sub!=='Yes'?'selected':''}>No</option><option value="Yes" ${q.sub==='Yes'?'selected':''}>Yes</option></select></td><td><input type="date" id="omoDate${t.id}" value="${e(q.date||'')}" ${allowed?'':'disabled'}></td><td>${allowed?`<button class="btn o" onclick="omoSubmissionSave('${t.id}')">Submit</button>`:'View only'}</td></tr>`}).join('')}</table></div>
+ <div class="card tw"><h3>Submission Log</h3><table><tr><th>Team</th><th>Submitted</th><th>Date</th><th>Updated by</th><th>Recorded at</th></tr>${L.map(x=>`<tr><td>${e(S.teams.find(t=>t.id===x.team)?.name||x.team)}</td><td>${e(x.submitted)}</td><td>${e(x.date)}</td><td>${e(x.by)}</td><td>${e(x.at)}</td></tr>`).join('')||'<tr><td colspan="5">No submissions recorded yet.</td></tr>'}</table></div>`;
+};
+/* The practice clock counts down from a trainer-entered duration. Run timer remains independent. */
+let omoCountdownFinished=false;
+function omoSetCountdown(){if(!EVD)return;const m=Number(document.getElementById('evalPrMin')?.value),sec=Number(document.getElementById('evalPrSec')?.value);
+ if(!Number.isInteger(m)||m<0||!Number.isInteger(sec)||sec<0||sec>59||m*60+sec<=0)return toast('Enter a countdown greater than zero, with seconds 0–59');
+ clearInterval(PVI);PVI=null;PVS=m*60+sec;EVD.ptime=mmss(PVS);EVD.practiceDuration=PVS;omoCountdownFinished=false;
+ const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;toast('Countdown set');
 }
-const omoPracticeCountdownOriginal=practiceView;
-practiceView=function(){
- let h=omoPracticeCountdownOriginal();
- h=h.replace(/<div class="sc"><div style="font-size:17px">PRACTICE TIMER<\/div>[\s\S]*?<div class="top" style="margin-top:14px">/,`<div class="sc"><div style="font-size:17px">PRACTICE COUNTDOWN</div><div id="practiceClock" style="font-size:clamp(62px,9vw,115px);font-weight:800;font-variant-numeric:tabular-nums">${prClock(PRACT.sec)}</div><div class="top" style="justify-content:center"><label>Set minutes <input type="number" id="omoCountdownMinutes" min="1" max="180" value="2" style="width:90px"></label><button class="btn g" onclick="omoCountdownSet()">Set</button><button class="btn o big" onclick="omoCountdownAction('start')">Start</button><button class="btn big" onclick="omoCountdownAction('stop')">Stop</button><button class="btn r big" onclick="omoCountdownAction('reset')">Reset</button></div></div><div class="top" style="margin-top:14px">`);
+const omoOriginalEvTm=evTm;
+evTm=function(a,w){if(w!=='p')return omoOriginalEvTm(a,w);
+ if(!EVD)return;
+ if(a==='stop'||a==='pause'){clearInterval(PVI);PVI=null;return}
+ if(a==='reset'){clearInterval(PVI);PVI=null;PVS=Number(EVD.practiceDuration)||0;EVD.ptime=mmss(PVS);omoCountdownFinished=false;const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;return}
+ if(a==='start'){clearInterval(PVI);PVI=null;PVS=Number(EVD.practiceDuration)||PVS;omoCountdownFinished=false}
+ if((a==='start'||a==='resume')&&PVS>0){clearInterval(PVI);PVI=setInterval(()=>{PVS=Math.max(0,PVS-1);EVD.ptime=mmss(PVS);const el=document.getElementById('ptm');if(el)el.textContent=EVD.ptime;if(PVS===0){clearInterval(PVI);PVI=null;if(!omoCountdownFinished){omoCountdownFinished=true;toast('Practice countdown completed')}}},1000)}
+ else if(PVS<=0)toast('Set minutes and seconds first');
+};
+const omoPreviousEvalForm=evForm;
+evForm=function(T){let h=omoPreviousEvalForm(T);if(!EVD)return h;
+ h=h.replace('Practice Timer – Manual Time','Practice Countdown – Set Minutes & Seconds').replace('Add Manual Time','Set Countdown').replace('onclick="t2SetEvalPracticeTime()"','onclick="omoSetCountdown()"').replace('⏱ Practice timer','⏳ Practice countdown');
  return h;
 };
 
