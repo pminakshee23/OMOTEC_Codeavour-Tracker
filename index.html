@@ -835,5 +835,96 @@ evForm=function(T){
  return h;
 };
 
+
+/* Unified Track 1/2/3 robot approval, Track 3 progression board, inventory form button */
+const omoPriorProf=prof;
+prof=function(t){
+ let h=omoPriorProf(t);
+ if(t.trk!==2){
+  h=h.replace('Robot approval is managed for Track 2 teams.', 'Robot approval submissions and reviews are available below.');
+  if(PT==='🤖 Robot Approval')h=h.replace('<div class="card">Robot approval submissions and reviews are available below.</div>',robotApprovalPanel(t));
+ }
+ return h;
+};
+robotApprovalPanel=function(t){
+ const is3=Number(t.trk)===3, parts=is3?[['r1','Robot 1'],['r2','Robot 2'],['backup','Backup Robot']]:[[Number(t.trk)===1?'prototype':'r1',Number(t.trk)===1?'Project / Prototype':'Robot']];
+ const all=(S.robotApprovals||[]).filter(x=>x.team===t.id),canSubmit=U.role==='admin'||(U.role==='trainer'&&t.tr===U.n),canReview=U.role==='admin'||(U.role==='lead'&&Number(U.trk)===Number(t.trk));
+ return `<div class="card"><h3>🤖 ${is3?'Robot 1, Robot 2 & Backup Robot':'Robot / Prototype'} Approval</h3><p>Trainer submits each robot status. The Track ${t.trk} Lead or Super Admin reviews it. Approval is available only when the submitted status is Completed.</p>
+ ${canSubmit?`<div class="top"><label>Robot <select id="omoRApart">${parts.map(([key,name])=>`<option value="${key}">${name}</option>`).join('')}</select></label><label>Status <select id="omoRAstatus"><option>Not Started</option><option>In Progress</option><option>Testing</option><option>Completed</option></select></label><label>Submission date <input type="date" id="omoRAdate" value="${today()}"></label></div><textarea id="omoRAnote" rows="2" style="width:100%" placeholder="Trainer comments / testing evidence"></textarea><p><button class="btn o" onclick="omoRobotSubmit('${t.id}')">Submit for Approval</button></p>`:''}
+ <div style="overflow-x:auto"><table><tr><th>Robot</th><th>Date</th><th>Trainer</th><th>Status</th><th>Trainer comments</th><th>Review</th><th>Reviewed by</th><th>Action / comments</th></tr>${all.slice().reverse().map(r=>`<tr><td>${e(parts.find(p=>p[0]===(r.part||'r1'))?.[1]||r.part||'Robot')}</td><td>${e(r.date||'')}</td><td>${e(r.by||'')}</td><td>${e(r.robotStatus||'')}</td><td>${e(r.note||'')}</td><td>${e(r.reviewStatus||'Submitted')}</td><td>${e(r.reviewBy||'')}</td><td>${canReview&&r.reviewStatus==='Submitted'?`<input id="omoRAreview${r.id}" placeholder="Lead/Admin comment"><button class="btn g" ${r.robotStatus==='Completed'?'':'disabled'} onclick="omoRobotReview('${r.id}','Approved')">Approve</button> <button class="btn o" onclick="omoRobotReview('${r.id}','Changes Required')">Request Changes</button>`:e(r.reviewNote||'')}</td></tr>`).join('')||'<tr><td colspan="8">No submissions yet</td></tr>'}</table></div></div>`;
+};
+function omoRobotSubmit(teamId){
+ const t=tm(teamId);if(!t||!(U.role==='admin'||(U.role==='trainer'&&t.tr===U.n)))return toast('Only assigned trainer or Super Admin can submit');
+ const part=document.getElementById('omoRApart')?.value,status=document.getElementById('omoRAstatus')?.value,date=document.getElementById('omoRAdate')?.value,note=document.getElementById('omoRAnote')?.value.trim()||'';
+ if(!part||!date)return toast('Select robot and date');
+ (S.robotApprovals=S.robotApprovals||[]).push({id:'RA'+Date.now()+Math.floor(Math.random()*1000),team:teamId,part,date,by:U.n,robotStatus:status,note,reviewStatus:'Submitted',reviewBy:'',reviewNote:''});
+ log('Submitted '+part+' for approval: '+status,teamId);save();toast('Submitted for review');draw();
+}
+function omoRobotReview(id,status){
+ const r=(S.robotApprovals||[]).find(x=>x.id===id);if(!r)return;const t=tm(r.team);
+ if(!(U.role==='admin'||(U.role==='lead'&&Number(U.trk)===Number(t.trk))))return toast('Lead / Super Admin access required');
+ if(status==='Approved'&&r.robotStatus!=='Completed')return toast('Only Completed robots can be approved');
+ r.reviewStatus=status;r.reviewBy=U.n;r.reviewNote=document.getElementById('omoRAreview'+id)?.value.trim()||'';r.reviewedAt=new Date().toLocaleString();
+ (t.robotApprovals=t.robotApprovals||{})[r.part||'r1']=status;
+ if(status==='Approved'){
+  if(r.part==='r1')t.r1='Functional';else if(r.part==='r2')t.r2='Functional';else if(r.part==='backup')t.backupRobotStatus='Functional';else if(r.part==='prototype')t.pr='Completed';
+ }
+ log('Robot '+(r.part||'r1')+' '+status,r.team);save();toast('Review saved');draw();
+}
+function omoTrack3Leaderboard(){
+ const rows=board();
+ return `<div class="card tw"><h3>🏆 Track 3 Team Leaderboard & Progress</h3><p>Ranking uses saved match results. Robot readiness is based on the latest approved submissions. Scores and progress update as matches and approvals are saved.</p><div style="overflow-x:auto"><table><tr><th>Rank</th><th>Team</th><th>Branch</th><th>Sessions</th><th>Robot 1</th><th>Robot 2</th><th>Backup</th><th>Played</th><th>Won</th><th>Drawn</th><th>Lost</th><th>Goals For</th><th>Goals Against</th><th>Points</th></tr>
+ ${rows.map((r,i)=>{const t=r.t,a=t.robotApprovals||{};return `<tr><td>${i+1}</td><td>${e(t.name)}</td><td>${e(t.br)}</td><td>${done(t)}/${t.s.length}</td><td>${e(a.r1||'Pending')}</td><td>${e(a.r2||'Pending')}</td><td>${e(a.backup||'Pending')}</td><td>${r.mp}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}</td><td>${r.ga}</td><td><b>${r.pts}</b></td></tr>`}).join('')||'<tr><td colspan="14">No Track 3 teams yet</td></tr>'}</table></div></div>`;
+}
+const omoPreviousMatch=match;
+match=function(){return omoPreviousMatch()+omoTrack3Leaderboard()};
+const omoPreviousInv=inv;
+inv=function(){let h=omoPreviousInv();return h.replace('<h2>📦 Inventory – Form Submission</h2>',`<h2>📦 Inventory – Form Submission</h2><div class="card"><h3>Inventory Submission Form</h3><p>Open the inventory form, then return here to record Yes / No and submission date.</p><button class="btn o big" onclick="window.open('${IQU}','_blank','noopener')">↗ Open Submission Form</button></div>`)};
+
+
+/* Track 1 deliverable readiness tracking — per-team, saved with dashboard state. */
+const omoTrack1Deliverables=[
+ ['documentation','📘 Documentation'],
+ ['poster','🎨 Poster Design'],
+ ['slides','🗣️ Presentation Slides'],
+ ['video','🎬 Video Demonstration'],
+ ['script','🗒️ Script (Presentation & Video)']
+];
+function omoDeliverablePanel(t){
+ const records=(S.track1Deliverables||{})[t.id]||{};
+ const allowed=U.role==='admin'||(U.role==='lead'&&Number(U.trk)===1)||(U.role==='trainer'&&t.tr===U.n);
+ const ready=omoTrack1Deliverables.filter(([id])=>records[id]?.status==='Ready').length;
+ return `<div class="card"><h3>📋 Track 1 – Submission Readiness Checklist</h3><p>Track all five competition deliverables for <b>${e(t.name)}</b>. Trainers and Track 1 Leads can update the status; every update records who changed it and when.</p><div class="top"><b>${ready} of 5 ready</b><div class="bar" style="width:220px"><i style="width:${ready*20}%"></i></div><span>${ready*20}% complete</span></div><div class="tw"><table><tr><th>Deliverable</th><th>Ready?</th><th>Remarks / Pending work</th><th>Last updated</th><th>Action</th></tr>${omoTrack1Deliverables.map(([id,label])=>{const r=records[id]||{},status=r.status||'Not Started';return `<tr><td><b>${label}</b></td><td>${allowed?`<select id="omoDelStatus_${id}"><option ${status==='Not Started'?'selected':''}>Not Started</option><option ${status==='In Progress'?'selected':''}>In Progress</option><option ${status==='Ready'?'selected':''}>Ready</option><option ${status==='Needs Changes'?'selected':''}>Needs Changes</option></select>`:e(status)}</td><td>${allowed?`<input id="omoDelNote_${id}" placeholder="Optional remarks" value="${e(r.note||'')}" style="min-width:190px">`:e(r.note||'—')}</td><td>${e(r.updatedAt||'—')}<br><small>${e(r.updatedBy||'')}</small></td><td>${allowed?`<button class="btn" onclick="omoSaveDeliverable('${e(t.id)}','${id}')">Save</button>`:'View only'}</td></tr>`}).join('')}</table></div></div>`;
+}
+function omoSaveDeliverable(teamId,item){
+ const t=tm(teamId);
+ if(!t||Number(t.trk)!==1)return toast('Track 1 team required');
+ if(!(U.role==='admin'||(U.role==='lead'&&Number(U.trk)===1)||(U.role==='trainer'&&t.tr===U.n)))return toast('You do not have permission to update this checklist');
+ if(!omoTrack1Deliverables.some(([id])=>id===item))return;
+ const status=document.getElementById('omoDelStatus_'+item)?.value;
+ const note=document.getElementById('omoDelNote_'+item)?.value.trim()||'';
+ if(!['Not Started','In Progress','Ready','Needs Changes'].includes(status))return;
+ S.track1Deliverables=S.track1Deliverables||{};
+ S.track1Deliverables[teamId]=S.track1Deliverables[teamId]||{};
+ S.track1Deliverables[teamId][item]={status,note,updatedBy:U.n,updatedAt:new Date().toLocaleString()};
+ log('Track 1 '+item+' readiness: '+status,teamId);save();toast('Readiness updated');draw();
+}
+const omoProfBeforeDeliverables=prof;
+prof=function(t){
+ let h=omoProfBeforeDeliverables(t);
+ if(Number(t.trk)!==1)return h;
+ const tab='📋 Submission Readiness';
+ const match=h.match(/<div class="tabs">[\s\S]*?<\/div>/);
+ if(match&&!match[0].includes(tab)){
+  const btn=`<button class="tab ${PT===tab?'on':''}" onclick="PT='${tab}';draw()">${tab}</button>`;
+  h=h.replace(match[0],match[0].replace('</div>',btn+'</div>'));
+ }
+ if(PT===tab){
+  const end=h.indexOf('</div>',h.indexOf('<div class="tabs">'));
+  if(end>=0)h=h.slice(0,end+6)+omoDeliverablePanel(t);
+ }
+ return h;
+};
+
 load();setTh(TH);(async()=>{if(CLOUD){if(!CODE)return codeUI();if(await cloudLoad()){await ensureHashes();loginUI();startPoll()}return}await ensureHashes();loginUI();initSync()})();
 </script></body></html>
